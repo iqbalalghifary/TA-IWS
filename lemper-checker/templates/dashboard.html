@@ -7,7 +7,7 @@
     <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js"></script>
     <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js"></script>
-
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/upload-form.css') }}">
     <title>Dashboard</title>
 </head>
 <body>
@@ -32,6 +32,19 @@
             </ul>
         </div>
     </nav>
+
+    <form action="/upload" method="POST" enctype="multipart/form-data" id="upload-form">
+        <div class="input-container">
+            <div class="inner-input-container pdf-container">
+                <div class="input-div-pdf">
+                    <!-- name sbg key untuk req ke BE -->
+                    <input type="file" name="pdf_file" accept=".pdf">
+                    <input type="submit" value="Upload">
+                </div>
+            </div>
+        </div>
+        <br>
+    </form>
 
     <!-- Konten halaman dashboard -->
     <div class="container mt-5">
