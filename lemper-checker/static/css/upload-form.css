@@ -1,0 +1,96 @@
+#upload-form {
+    display: grid;
+    place-items: center;
+}
+
+.input-container {
+    margin-top: 60px;
+    text-align: center;
+    gap: 30px;
+    display: flex;
+    /* max-height: 114px; */
+}
+
+.inner-input-container {
+    display: inline-block;
+    /* padding: 1rem 1rem; */
+    vertical-align: top;
+}
+
+.input-div-pdf {
+    width: fit-content;
+    block-size: fit-content;
+    background: #FA6800;
+    color: #FFFFFF;
+    border-radius: 5px;
+    box-shadow: 4px 4px 25px 0px rgba(0, 0, 0, 0.25);
+    display: inline-flex;
+    padding: 26px 62px;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    font-size: 24px;
+    font-weight: 700;
+    border:solid #FA6800;
+}
+
+.input-file {
+    position: absolute;
+    top: 0; left: 0;
+    opacity: 0;
+    padding: 0;
+    margin: 0;
+    cursor: pointer;
+}
+
+.input-file-label {
+    display: block;
+    font-size: 24px;
+    font-weight: bold;
+    transition: all .4s;
+    cursor: pointer;    
+    gap: 10px;
+}
+
+.input-div:hover {
+  background: #C85300;
+  color: white;
+}
+
+.file-return {
+    margin: 0;
+    text-align: left;
+}
+.file-return:not(:empty) {
+    margin: 1em 0;
+}
+.file-return {
+    font-size: 12px;
+    font-weight: 200;
+    letter-spacing: 0.6px;
+}
+.file-return:not(:empty):before {
+    /* content: "Selected file: "; */
+    font-style: normal;
+    font-weight: normal;
+}
+
+.validate-button {
+    font-size: 18px;
+    border-radius: 5px;
+    border: 1px solid #FA6800;
+    margin: 60px;
+}
+
+button {
+    letter-spacing: 0.18px;
+    margin: 8px 16px;
+    border: none;
+    background-color: transparent;
+    color: #FA6800;
+}
+
+button i {
+    padding-left: 11px;
+    color: #FA6800;
+}
