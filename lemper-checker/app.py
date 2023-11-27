@@ -7,6 +7,7 @@ from passlib.hash import bcrypt
 import os
 import fitz
 import re
+import psycopg2
 
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.units import inch
@@ -271,6 +272,12 @@ def upload():
         uploaded_file.save(pdf_path)
 
         deteksi_nama(pdf_path)
+        # Set the start and end keywords
+        start_keyword = 'Pembimbing'
+        end_keyword = 'NIP'
+
+        # Call the extraction function
+        extracted_text = extract_text_between_keywords(pdf_file_path, start_keyword, end_keyword)
 
         # Lakukan perhitungan
         # keyword = 'Disusun oleh'
