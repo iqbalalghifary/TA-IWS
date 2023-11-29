@@ -9,13 +9,17 @@ import fitz
 import re
 import psycopg2
 import io
+from dotenv import load_dotenv #nambahin env
 
 app = Flask(__name__)
-app.secret_key = 'your_secret_key_here'  # Ganti dengan kunci rahasia yang kuat
+load_dotenv() #load .env
+
+app.secret_key = os.environ.get("SECRET_KEY")
 app.config['SESSION_TYPE'] = 'filesystem'
 
-# Konfigurasi database
-app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres:1234@localhost/lemper'
+# Database configurations
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get("DATABASE_URL")
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 uploads_directory = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'static/uploads')
@@ -322,3 +326,4 @@ def upload():
 
 if __name__ == '__main__':
     app.run()
+
