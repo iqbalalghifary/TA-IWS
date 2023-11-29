@@ -2,11 +2,133 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Report</title>
-    
+    <!-- Include jsPDF library -->
+    <script src="{{ url_for('static', filename='jsPDF-master/dist/jspdf.umd.min.js') }}"></script>
 </head>
 <body>
-    
+    <h1>Generate PDF using jsPDF</h1>
+    <div id="message-container">
+        {% for message in title_messages %}
+            <p>{{ message }}</p>
+        {% endfor %}
+    </div>
+    <button onclick="generatePDF()">Generate PDF</button>
+
+    <!-- Add an iframe for PDF preview -->
+    <iframe id="pdf-preview" width="100%" height="600px" style="border: 1px solid #ddd;"></iframe>
+
+    <script>
+        window.jsPDF = window.jspdf.jsPDF;
+
+        function generatePDF() {
+            // Create a new jsPDF instance
+            var doc = new jsPDF();
+
+            // Set font for the document (Georgia)
+            doc.setFont('helvetica');
+
+            // Access the message container element
+            var messageContainer = document.getElementById('message-container');
+            
+            // // Iterate through the paragraphs and add them to the PDF
+            // var paragraphs = messageContainer.getElementsByTagName('p');
+            // for (var i = 0; i < paragraphs.length; i++) {
+            //     var paragraph = paragraphs[i];
+            //     var text = paragraph.innerText || paragraph.textContent;  // Handle different browser support
+            //     doc.text(text, 10, i * 10 + 100);  // Adjust the position as needed
+            // }
+
+            // Add logo to the top right corner
+            var logoWidth = 50; // Adjust the width of the logo as needed
+            var logoHeight = 30; // Adjust the height of the logo as needed
+            var logoImage = '{{ url_for("static", filename="img/lemper-logo.png") }}'; // Provide the correct path using url_for
+            doc.addImage(logoImage, 'PNG', doc.internal.pageSize.width - logoWidth - 10, 5, logoWidth, logoHeight);
+
+            // Add three lines of text next to the logo on the left
+            var textLeft = 10; // Adjust the left position as needed
+            var textTop = 20; // Adjust the top position as needed
+            doc.setFontSize(12); // Adjust the font size as needed
+            doc.text('User  : {{ user_name }}', textLeft, textTop);
+            doc.text('NIM   : {{ user_nim }}', textLeft, textTop + 5);
+            
+            // Get the current date in Indonesia's time zone
+            var currentDate = new Date();
+            var options = { 
+                timeZone: 'Asia/Jakarta',
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric'
+            };
+            var formattedDate = currentDate.toLocaleDateString('en-US', options);
+
+            doc.text('Date  : ' + formattedDate, textLeft, textTop + 10);
+            
+            // Add underline to the text "Halaman Persetujuan"
+            doc.setFontSize(16);  // Adjust the size as needed
+            doc.text('Halaman Persetujuan', 10, 50);
+            doc.line(10, 53, 200, 53);
+            
+            doc.setTextColor(255, 0, 0);  // Red color
+            doc.setFontSize(12); // Adjust the size as needed
+            doc.text('Validity Report', 10, 60);
+
+            doc.setTextColor(0, 0, 0);  // Black color
+            doc.line(10, 63, 200, 63);
+
+            // Check the word count and set the result accordingly
+            var word_count_result = "{{ word_count_result }}"; // Access Flask variable in JavaScript
+            var note = "{{ note }}"; // Access Flask variable in JavaScript
+
+            // Determine the color based on the content of word_count_result
+            var textColor = word_count_result.includes('PASS') ? [0, 128, 0] : // Green for PASS
+                            word_count_result.includes('FAIL') ? [255, 0, 0] : // Red for FAIL
+                            [0, 0, 0];  // Default color (black)
+
+            doc.setTextColor.apply(null, textColor);
+            doc.setFontSize(12);
+
+            // Align "PASS" or "FAIL" to the right
+            doc.text(word_count_result, doc.internal.pageSize.width - 20, 70, { align: 'right' });
+
+            // Display the note below the word count result with a smaller font size, different style, and black color
+            doc.setFontSize(10);  // Adjust the font size as needed
+            doc.setFont('arial');  // Change the font style (italic in this example)
+            doc.setTextColor(0, 0, 0);  // Set text color to black
+            doc.text(note, 10, 75);  // Adjust the position and styling as needed
+
+            doc.setTextColor(0, 0, 0);  // Black color
+            doc.setFontSize(12); // Adjust the size as needed
+            doc.setFont('helvetica');
+
+            doc.text('JUDUL', 10, 70);
+            doc.line(10, 80, 200, 80);
+
+            doc.text('NAMA LENGKAP DAN GELAR PEMBIMBING JURUSAN', 10, 87);
+            doc.line(10, 97, 200, 97);
+
+            doc.text('NIP PEMBIMBING JURUSAN', 10, 104);
+            doc.line(10, 114, 200, 114);
+
+            doc.text('NAMA LENGKAP DAN GELAR KETUA PRODI', 10, 121);
+            doc.line(10, 131, 200, 131);
+
+            doc.text('NIP KETUA PRODI', 10, 138);
+            doc.line(10, 148, 200, 148);
+
+            // Save the PDF content as a Blob
+            var pdfBlob = doc.output('blob');
+
+            // Create a URL for the Blob
+            var pdfUrl = URL.createObjectURL(pdfBlob);
+
+            // Show the PDF preview iframe and set its source
+            var pdfPreview = document.getElementById('pdf-preview');
+            pdfPreview.style.display = 'block';
+            pdfPreview.src = pdfUrl;
+        }
+    </script>
 </body>
 </html>

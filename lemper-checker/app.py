@@ -8,15 +8,6 @@ import os
 import fitz
 import re
 import psycopg2
-
-from reportlab.lib.pagesizes import letter
-from reportlab.lib.units import inch
-from reportlab.pdfgen import canvas
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import letter
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from flask import make_response
 import io
 
 app = Flask(__name__)
@@ -90,6 +81,10 @@ def logout():
     session['logged_in'] = False  # Mengubah status login dalam sesi
     return redirect(url_for('login'))
 
+@app.route('/lupa_password')
+def lupa_password():
+    return render_template('lupa_password.html')
+    
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
     if request.method == 'POST':
@@ -262,6 +257,47 @@ def deteksi_nama(pdf_path):
     except Exception as e:
         return str(e)
 
+def cek_judul(pdf_path):
+    doc = fitz.open(pdf_path) #buka pdf
+
+    results = []  # Inisialisasi list untuk menyimpan hasil pengecekan judul
+
+    for page_num in range(doc.page_count):
+        page = doc[page_num]
+        text = page.get_text()
+
+        lines = text.split('\n')
+        previous_lines = []
+
+        for line in lines:
+            if not line.strip():
+                # Jika menemukan baris baru kosong, tambahkan bagian sebelumnya ke list results
+                if previous_lines:
+                    result = ' '.join(previous_lines)
+                    print(result)
+
+                    # Hitung jumlah kata pada variabel result
+                    word_count = len(result.split())
+                    results.append(f"Jumlah kata pada judul laporan anda: {word_count}")
+
+                    # Berikan status sesuai jumlah kata
+                    if 12 <= word_count <= 20:
+                        word_count_result = "PASS"
+                        note = "Judul telah sesuai aturan"
+                    elif word_count == 1:
+                        word_count_result = "Status: Perbaiki posisi penomoran halaman"
+                    elif word_count > 20 or word_count < 12:
+                        word_count_result = "FAIL"
+                        note = "Judul pada halaman persetujuan seharusnya terdiri dari 12-20 kata. Jumlah kata yang terdeteksi saat ini {word_count} kata."
+                    doc.close()
+                    return results, word_count_result, note  # Mengembalikan list hasil
+                previous_lines = []
+            else:
+                previous_lines.append(line)
+
+    doc.close()
+    results.append(f"Tidak ditemukan baris baru kosong.")
+
 @app.route('/upload', methods=['POST'])
 def upload():
     uploaded_file = request.files['pdf_file']
@@ -270,76 +306,19 @@ def upload():
         # Simpan file PDF yang diunggah di server
         pdf_path = os.path.join(uploads_directory, uploaded_file.filename)
         uploaded_file.save(pdf_path)
+    
+        # Lakukan pengecekan judul
+        title_messages, word_count_result, note = cek_judul(pdf_path)
 
-        deteksi_nama(pdf_path)
-        # Set the start and end keywords
-        start_keyword = 'Pembimbing'
-        end_keyword = 'NIP'
+        user_name = current_user.full_name
+        user_nim = current_user.student_id
 
-        # Call the extraction function
-        extracted_text = extract_text_between_keywords(pdf_file_path, start_keyword, end_keyword)
-
-        # Lakukan perhitungan
-        # keyword = 'Disusun oleh'
-        # title_message = count_words_in_pdf_before_keyword(pdf_path, keyword)
+        # Lakukan pengecekan kaprodi
+        # deteksi_nama(pdf_path)
      
         os.remove(pdf_path)  # Hapus file setelah digunakan
-            
-        # Create a PDF receipt with the message and user's name
-        # output = io.BytesIO()
 
-        # Create a SimpleDocTemplate with custom margins
-        # doc = SimpleDocTemplate(output, pagesize=letter, leftMargin=1 * inch, rightMargin=1 * inch, topMargin=1 * inch, bottomMargin=1 * inch)
-
-         # Assuming the user's name is stored in 'current_user.full_name' (modify as needed)
-        # user_name = current_user.full_name
-        # user_nim = current_user.student_id
-
-        # Create a list of flowables (content elements)
-        # styles = getSampleStyleSheet()
-        # elements = []
-
-        # Add the user's name and the analysis result to the elements list
-        # elements.append(Paragraph("Report Hasil Pengecekan", styles['Title']))
-        # elements.append(Spacer(1, 0.2 * inch))
-        # elements.append(Paragraph(f"Nama Mahasiswa: {user_name}", styles['Normal']))
-        # elements.append(Paragraph(f"NIM: {user_nim}", styles['Normal']))
-        # elements.append(Spacer(1, 0.2 * inch))
-
-        # status 1
-        # elements.append(Paragraph("Status Judul:", styles['Normal']))
-        # Create a custom paragraph style for the analysis result with word wrapping
-        # analysis_style = ParagraphStyle(name='AnalysisStyle', parent=styles['Normal'])
-        # analysis_style.wordWrap = 'CJK'
-        # Add the analysis result with word wrapping to the elements list
-        # analysis_result = Paragraph(title_message, analysis_style)
-        # elements.append(analysis_result)
-
-        # status 2
-        # elements.append(Paragraph("Status Nama lengkap dan Gelar Pembimbing Jurusan:", styles['Normal']))
-
-        # status 3
-        # elements.append(Paragraph("Status NIP Pembimbing Jurusan:", styles['Normal']))
-
-        # status 4
-        # elements.append(Paragraph("Status Nama lengkap dan Gelar Ketua Prodi:", styles['Normal']))
-
-        # status 5
-        # elements.append(Paragraph("Status NIP Ketua Prodi:", styles['Normal']))
-
-
-        # Build the PDF document
-        # doc.build(elements)
-
-        # output.seek(0)
-
-        # response = make_response(output.read())
-        # response.headers['Content-Type'] = 'application/pdf'
-        # response.headers['Content-Disposition'] = f'inline; filename=analysis_receipt.pdf'
-
-        # return response
-
-    return render_template('report.html')
+    return render_template('report.html', title_messages=title_messages, user_name=user_name, user_nim=user_nim, word_count_result=word_count_result, note=note)
 
 if __name__ == '__main__':
     app.run()
