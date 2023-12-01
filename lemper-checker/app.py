@@ -1,6 +1,8 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, session
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import create_engine, text
+from sqlalchemy.orm import sessionmaker
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_migrate import Migrate
 from passlib.hash import bcrypt
@@ -120,143 +122,69 @@ def dashboard():
         return redirect(url_for('login'))
     return render_template('dashboard.html')
 
-def count_words_in_pdf_before_keyword(pdf_path, keyword):
-    # algoritma pengecekan
-    try:
-            # Buka file PDF
-            pdf_document = fitz.open(pdf_path)
-
-            # Inisialisasi variabel untuk menyimpan teks dari PDF
-            pdf_text = ""
-
-            # Ekstrak teks dari semua halaman PDF
-            for page_num in range(len(pdf_document)):
-                page = pdf_document[page_num]
-                page_text = page.get_text()
-                pdf_text += page_text
-
-                # Hentikan ekstraksi setelah menemukan kata kunci
-                if keyword in page_text:
-                    break
-
-            # Tutup file PDF
-            pdf_document.close()
-
-            # Pemotongan teks hingga sebelum kata kunci
-            index = pdf_text.find(keyword)
-            if index != -1:
-                pdf_text = pdf_text[:index]
-
-             # Menghitung jumlah kata dalam teks PDF
-            words = pdf_text.split()
-            word_count = len(words)
-
-            # Menentukan pesan berdasarkan jumlah kata
-            if 12 <= word_count <= 20:
-                return "Pass"
-            else:
-               return f"Fail.Penulisan judul tidak sesuai aturan, tolong perbaiki kembali! Jumlah kata: {word_count}, seharusnya di antara 12-20 kata."
-
-    except Exception as e:
-        return str(e)
-
-def get_dosbing(pdf_path):
-    try:
-        # Buka file PDF
-        doc = fitz.open(pdf_path)
-
-        # Ambil teks dari halaman pertama
-        page = doc[0]
-        text = page.get_text("text")
-
-        # Cari teks "Pembimbing JTK Polban" dan "Pembimbing Industri"
-        pembimbing_jtk_index = text.find("Pembimbing JTK Polban")
-        pembimbing_industri_index = text.find("Pembimbing Industri")
-
-        if pembimbing_jtk_index != -1 and pembimbing_industri_index != -1:
-            # Ambil teks di antara "Pembimbing JTK Polban" dan "Pembimbing Industri" sebagai nama pembimbing JTK
-            nama_pembimbing_jtk = text[pembimbing_jtk_index + len("Pembimbing JTK Polban"): pembimbing_industri_index].strip()
-            # Hapus NIP dari teks nama pembimbing JTK
-            nama_pembimbing_jtk_clean = nama_pembimbing_jtk.split('NIP')[0].strip()
-
-            # Cocokkan pola regex
-            match = re.match(r'^[A-Za-z]+(?:\s[A-Za-z]+){1,}\s(?:[A-Za-z]+\.\s?){2}$', nama_pembimbing_jtk_clean)
-            
-            if match:
-                return match.group()
-            else:
-                return match.group()
-
-        elif pembimbing_industri_index != -1:
-            # Ambil teks di antara "Pembimbing Industri" dan "NIP" jika tidak ada teks di antara "Pembimbing JTK Polban" dan "Pembimbing Industri"
-            nama_pembimbing_industri_index = text.find("Pembimbing Industri")
-            nip_index = text.find("NIP")
-            nama_pembimbing_industri = text[nama_pembimbing_industri_index + len("Pembimbing Industri"): nip_index].strip()
-
-            # Cocokkan pola regex
-            match = re.match(r'^[A-Za-z]+(?:\s[A-Za-z]+){1,}\s(?:[A-Za-z]+\.\s?){2}$', nama_pembimbing_industri)
-            
-            if match:
-                return match.group()
-            else:
-                return match.group()
-
-        else:
-            return "Tidak ada informasi pembimbing"
-
-    except Exception as e:
-        return str(e)
-
-def cek_nip(numbers):
-    try:
-        # Mencocokkan nomor dengan nip pada tabel
-        for number in numbers:
-            lecturer = Lecturer.query.filter_by(nip=number).first()
-            if lecturer:
-                print(f"NIP {number} sudah benar. Nama: {lecturer.full_name}")
-            else:
-                print(f"NIP {number} tidak ditemukan dalam tabel lecturer.")
-
-    except Exception as e:
-        print(f"Error: {e}")
-
 def deteksi_nama(pdf_path):
     try:
+        start_keyword = "ketua"
         pdf_document = fitz.open(pdf_path)
-
-        pattern_santi = r'Santi Sundari, S\.Si\., M\.T\.'
-        pattern_ghifari = r'Ghifari Munawar, S\.Kom\., M\.T\.'
-
         match_found = False
 
         for page_num in range(pdf_document.page_count):
             page = pdf_document[page_num]
-            text = page.get_text()
+            page_text = page.get_text()
 
-            match_santi = re.search(pattern_santi, text)
-            match_ghifari = re.search(pattern_ghifari, text)
+            start_index = page_text.lower().find(start_keyword)
+            if start_index != -1:
+                extracted_text = page_text[start_index + len(start_keyword):].strip()
+                print(f": {extracted_text}")
+
+                pattern_santi = r'Santi Sundari, S\.Si\., M\.T\.'
+                pattern_ghifari = r'Ghifari Munawar, S\.Kom\., M\.T\.'
+
+                match_santi = re.search(pattern_santi, extracted_text)
+                match_ghifari = re.search(pattern_ghifari, extracted_text)
 
             if match_santi:
                 match_found = True
                 # Extract text after the matched pattern
-                remaining_text = text[match_santi.end():]
+                remaining_text = extracted_text[match_santi.end():]
                 # Extract only numerical values using regular expression
                 numbers = re.findall(r'\d+', remaining_text)
+                status_kaprodi = "PASS"
+                ket_status_kaprodi = f"Penulisan Ketua Prodi sudah jurusan sesuai data dosen!"
+                print(f"nama yang ditemukan: {remaining_text}")
                 print(f"Nama ditemukan di halaman {page_num + 1}: Santi Sundari, S.Si., M.T.")
                 print(f"Angka setelah nama: {numbers}")
-                cek_nip(numbers)
+
             if match_ghifari:
                 match_found = True
-                remaining_text = text[match_ghifari.end():]
+                remaining_text = extracted_text[match_ghifari.end():]
                 numbers = re.findall(r'\d+', remaining_text)
+                status_kaprodi = "PASS"
+                ket_status_kaprodi = f"Penulisan Ketua Prodi sudah sesuai dengan data dosen!"
+                print(f"nama yang ditemukan: {remaining_text}")
                 print(f"Nama ditemukan di halaman {page_num + 1}: Ghifari Munawar, S.Kom., M.T.")
                 print(f"Angka setelah nama: {numbers}")
-                cek_nip(numbers)
+
+            # Mencocokkan nomor dengan nip pada tabel
+            for number in numbers:
+                lecturer = Lecturer.query.filter_by(nip=number).first()
+                if lecturer:
+                    print(f"NIP {number} sudah benar. Nama: {lecturer.full_name}")
+                    status_nip_kaprodi = "PASS"
+                    ket_status_nip_kaprodi = f"NIP Ketua Prodi sudah tepat!"
+                else:
+                    print(f"NIP {number} tidak ditemukan dalam tabel lecturer.")
+                    status_nip_kaprodi = "FAIL"
+                    ket_status_nip_kaprodi = f"NIP Ketua Prodi belum tepat!"
 
         pdf_document.close()
 
         if not match_found:
             print("Nama tidak ditemukan dalam file PDF.")
+            status_kaprodi = "PASS"
+            ket_status_kaprodi = f"Penulisan Ketua Prodi belum sesuai dengan data dosen!"
+        
+        return  status_kaprodi, ket_status_kaprodi, status_nip_kaprodi, ket_status_nip_kaprodi
 
     except Exception as e:
         return str(e)
@@ -287,12 +215,12 @@ def cek_judul(pdf_path):
                     # Berikan status sesuai jumlah kata
                     if 12 <= word_count <= 20:
                         word_count_result = "PASS"
-                        note = "Judul telah sesuai aturan"
+                        note = f"Penulisan Judul sudah sesuai aturan"
                     elif word_count == 1:
-                        word_count_result = "Status: Perbaiki posisi penomoran halaman"
+                        word_count_result = "Perbaiki posisi penomoran halaman"
                     elif word_count > 20 or word_count < 12:
                         word_count_result = "FAIL"
-                        note = "Judul pada halaman persetujuan seharusnya terdiri dari 12-20 kata. Jumlah kata yang terdeteksi saat ini {word_count} kata."
+                        note = f"Penulisan Judul belum sesuai aturan. pada halaman persetujuan seharusnya terdiri dari 12-20 kata. Jumlah kata yang terdeteksi saat ini {word_count} kata."
                     doc.close()
                     return results, word_count_result, note  # Mengembalikan list hasil
                 previous_lines = []
@@ -302,6 +230,182 @@ def cek_judul(pdf_path):
     doc.close()
     results.append(f"Tidak ditemukan baris baru kosong.")
 
+def cek_dosbing(pdf_path, keyword_start, keyword_end, database_url):
+    # Set the start and end keywords
+    start_keyword = keyword_start
+    end_keyword = keyword_end
+
+    # Buka file PDF
+    pdf_document = fitz.open(pdf_path)
+
+    # Inisialisasi teks hasil ekstraksi
+    extracted_text = ""
+
+    # Loop melalui setiap halaman dan ekstrak teks
+    for page_number in range(pdf_document.page_count):
+        page = pdf_document[page_number]
+        page_text = page.get_text()
+
+        # Cari indeks kata kunci awal
+        start_index = page_text.find(start_keyword)
+
+        # Cari indeks kata kunci akhir
+        end_index = page_text.find(end_keyword)
+
+        # Ekstrak teks di antara dua kata kunci (jika ditemukan)
+        if start_index != -1 and end_index != -1:
+            extracted_text += page_text[start_index + len(start_keyword):end_index].strip()
+
+    # Tutup file PDF
+    pdf_document.close()
+
+    # Create a SQLAlchemy engine
+    engine = create_engine(database_url)
+
+    # Connect to the database using the engine
+    with engine.connect() as connection:
+        # Use SQLAlchemy text() function to create a text-based SQL query
+        query = text('SELECT full_name FROM lecturer')
+
+        # Execute the query
+        result_set = connection.execute(query)
+
+        # List to store similar keywords
+        similar_keywords = []
+
+        # Iterate through the database results
+        for row in result_set:
+            nama_database = row[0]
+            
+            # Check if the database keyword is present in the extracted text
+            if nama_database in extracted_text:
+                similar_keywords.append(nama_database)
+
+    # Display similar keywords
+    if similar_keywords:
+        keterangan = f"Penulisan Pembimbing Jurusan sudah sesuai dengan data dosen!"
+        for keyword in similar_keywords:
+            print(keyword)
+            print('PASS')
+            status_nama_dosbing = "PASS"
+    else:
+        keterangan = f"Penulisan Pembimbing Jurusan belum sesuai dengan data dosen!"
+        print('FAIL')
+        status_nama_dosbing = "FAIL"
+    return status_nama_dosbing, keterangan
+
+def cek_nip_dosbing(pdf_path, start_keyword, end_keyword, database_url):
+    def extract_text_from_pdf(pdf_path):
+        pdf_document = fitz.open(pdf_path)
+        text = ""
+
+        for page_number in range(pdf_document.page_count):
+            page = pdf_document[page_number]
+            page_text = page.get_text()
+            text += page_text
+
+        pdf_document.close()
+        return text
+
+    def fetch_full_names_from_database(database_url):
+        try:
+            engine = create_engine(database_url)
+            Session = sessionmaker(bind=engine)
+            session = Session()
+
+            result = session.execute(text("SELECT full_name FROM lecturer"))
+            full_names = [row[0] for row in result.fetchall()]
+
+            return full_names
+
+        except Exception as error:
+            print("Error while connecting to the database:", error)
+
+        finally:
+            session.close()
+
+    def extract_nip_from_pdf(pdf_path):
+        pdf_document = fitz.open(pdf_path)
+        text = ""
+
+        for page_number in range(pdf_document.page_count):
+            page = pdf_document[page_number]
+            page_text = page.get_text()
+            text += page_text
+
+        pdf_document.close()
+
+        nip_match = re.search(r'NIP\.?\s*(\d+)', text)
+        if nip_match:
+            extracted_nip = nip_match.group(1)
+            return extracted_nip
+        else:
+            return None
+
+    pdf_text = extract_text_from_pdf(pdf_path)
+
+    start_index = pdf_text.find(start_keyword)
+    end_index = pdf_text.find(end_keyword)
+
+    if start_index != -1 and end_index != -1:
+        extracted_text = pdf_text[start_index + len(start_keyword):end_index].strip()
+
+        full_names_from_db = fetch_full_names_from_database(database_url)
+
+        matching_names = [name for name in full_names_from_db if any(word.lower() in name.lower() for word in extracted_text.split())]
+
+        if matching_names:
+            best_match = None
+            max_matching_words = 0
+
+            for matching_name in matching_names:
+                matching_words = [word for word in matching_name.split() if word.lower() in extracted_text.lower()]
+                if len(matching_words) > max_matching_words:
+                    best_match = matching_name
+                    max_matching_words = len(matching_words)
+
+            if best_match:
+                try:
+                    engine = create_engine(database_url)
+                    Session = sessionmaker(bind=engine)
+                    session = Session()
+
+                    result = session.execute(text("SELECT nip FROM lecturer WHERE full_name = :name"), {"name": best_match})
+                    nip_result = result.fetchone()
+
+                    if nip_result:
+                        print(f"Seharusnya NIP ditulis: {nip_result[0]}")
+
+                        extracted_nip_same = extract_nip_from_pdf(pdf_path)
+
+                        if extracted_nip_same:
+                            print(f"NIP yang anda tulis: {extracted_nip_same}")
+
+                            if extracted_nip_same == nip_result[0]:
+                                status_nip_dosbing = "PASS"
+                                ket_nip_dosbing = f"NIP sudah tepat. NIP yang terdeteksi : {extracted_nip_same}"
+                            else:
+                                status_nip_dosbing = "FAIL"
+                                ket_nip_dosbing = f"NIP belum tepat. NIP yang terdeteksi : {extracted_nip_same}. Seharusnya {nip_result[0]}"
+                        else:
+                            print("NIP tidak ditemukan pada laporan")
+                    else:
+                        print("NIP tidak ditemukan pada database")
+
+                except Exception as error:
+                    print("Error while connecting to the database:", error)
+
+                finally:
+                    session.close()
+
+            else:
+                print("No Matching Words Found")
+        else:
+            print("\nNo Matching Names Found in Database")
+    else:
+        print("Keywords not found in the extracted text.")
+    return status_nip_dosbing, ket_nip_dosbing
+
 @app.route('/upload', methods=['POST'])
 def upload():
     uploaded_file = request.files['pdf_file']
@@ -310,9 +414,23 @@ def upload():
         # Simpan file PDF yang diunggah di server
         pdf_path = os.path.join(uploads_directory, uploaded_file.filename)
         uploaded_file.save(pdf_path)
-    
+
+        # Set the start and end keywords untuk cek nama dosbing
+        start_keyword = 'Pembimbing'
+        end_keyword = 'NIP'
+
+        database_url = os.environ.get("DATABASE_URL")
+
+        # Lakukan pengecekan nama dosbing
+        status_nama_dosbing, keterangan = cek_dosbing(pdf_path, start_keyword, end_keyword, database_url)
+
+        # Lakukan pengecekan nip dosbing
+        status_nip_dosbing, ket_nip_dosbing = cek_nip_dosbing(pdf_path, start_keyword, end_keyword, database_url)
+        
         # Lakukan pengecekan judul
         title_messages, word_count_result, note = cek_judul(pdf_path)
+
+        status_kaprodi, ket_status_kaprodi, status_nip_kaprodi, ket_status_nip_kaprodi = deteksi_nama(pdf_path)
 
         user_name = current_user.full_name
         user_nim = current_user.student_id
@@ -322,7 +440,7 @@ def upload():
      
         os.remove(pdf_path)  # Hapus file setelah digunakan
 
-    return render_template('report.html', title_messages=title_messages, user_name=user_name, user_nim=user_nim, word_count_result=word_count_result, note=note)
+    return render_template('report.html', title_messages=title_messages, user_name=user_name, user_nim=user_nim, word_count_result=word_count_result, note=note, status_nama_dosbing=status_nama_dosbing, keterangan=keterangan, status_nip_dosbing=status_nip_dosbing, ket_nip_dosbing=ket_nip_dosbing, status_kaprodi=status_kaprodi, ket_status_kaprodi=ket_status_kaprodi, status_nip_kaprodi=status_nip_kaprodi, ket_status_nip_kaprodi=ket_status_nip_kaprodi)
 
 if __name__ == '__main__':
     app.run()
