@@ -1,49 +1,109 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <!-- Bootstrap CSS -->
-    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css">
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <title>Register</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="static/css/register.css">
 </head>
+
 <body>
     {% include "header.html" %}
-
-    <div class="container mt-5">
-        <h1>Register</h1>
-        <form method="post" action="/signup">
-            <div class="form-group">
-                <label for="full_name">Full Name</label>
-                <input type="text" class="form-control" id="full_name" name="full_name" required>
+    <div id="card">
+        <div id="card-content">
+            <div id="card-title">
+                <h2>REGISTER</h2>
             </div>
-            <div class="form-group">
-                <label for="student_id">Student ID</label>
-                <input type="text" class="form-control" id="student_id" name="student_id" required>
-            </div>
-            <div class="form-group">
-                <label for="email">Email</label>
-                <input type="email" class="form-control" id="email" name="email" required>
-            </div>
-            <div class="form-group">
-                <label for="password">Password</label>
-                <input type="password" class="form-control" id="password" name="password" required>
-            </div>
-            <div class="form-group">
-                <label for="confirm_password">Confirm Password</label>
-                <input type="password" class="form-control" id="confirm_password" name="confirm_password" required>
-            </div>
-            <button type="submit" class="btn btn-primary">Register</button>
-        </form>
+            <form method="post" class="form" action="/signup">
+                <label for="user-fullname" style="padding-top:13px">
+                    &nbsp;Nama
+                </label>
+                <input id="user-fullname" class="form-content" type="text" name="fullname" autocomplete="on" required maxlength="255" />
+                <div class="form-border"></div>                
+            
+                <label for="user-nim" style="padding-top:13px">
+                    &nbsp;NIM
+                </label>
+                <input id="user-nim" class="form-content" type="text" name="nim" pattern="[0-9]+" title="Please enter only numeric characters" autocomplete="on" required />
+                <div class="form-border"></div>
+            
+                <label for="user-email" style="padding-top:13px">
+                    &nbsp;Email
+                </label>
+                <input id="user-email" class="form-content" type="email" name="email" autocomplete="on" required />
+                <div class="form-border"></div>
+            
+                <label for="user-password" style="padding-top:22px">
+                    &nbsp;Password
+                </label>
+                <input id="user-password" class="form-content" type="password" name="password" required />
+                <div class="form-border"></div>
+                <span id="password-error" style="color: red;"></span>
+            
+                <label for="confirm-password" style="padding-top:22px">
+                    &nbsp;Konfirmasi Password
+                </label>
+                <input id="confirm-password" class="form-content" type="password" name="confirm_password" required />
+                <div class="form-border"></div>
+                <span id="password-match-error" style="color: red;"></span>
+            
+                <input id="submit-btn" type="submit" name="submit" value="SIGN UP" />
+            </form>                
+        </div>
     </div>
+
     {% with messages = get_flashed_messages(with_categories=true) %}
     {% if messages %}
     <ul>
-      {% for category, message in messages %}
-      <li{% if category %} class="{{ category }}"{% endif %}>{{ message }}</li>
-      {% endfor %}
+        {% for category, message in messages %}
+        <li{% if category %} class="{{ category }}"{% endif %}>{{ message }}</li>
+        {% endfor %}
     </ul>
     {% endif %}
     {% endwith %}
-    
+
+    <script>
+        document.getElementById("user-password").addEventListener("input", function () {
+            var password = document.getElementById("user-password").value;
+            var errorElement = document.getElementById("password-error");
+
+            // Validasi panjang password
+            if (password.length < 8) {
+                errorElement.textContent = "Password harus memiliki minimal 8 karakter";
+            } else {
+                // Validasi keberadaan huruf kapital, huruf kecil, dan angka
+                var hasUpperCase = /[A-Z]/.test(password);
+                var hasLowerCase = /[a-z]/.test(password);
+                var hasDigit = /\d/.test(password);
+
+                if (hasUpperCase && hasLowerCase && hasDigit) {
+                    errorElement.textContent = "";
+                } else {
+                    errorElement.textContent = "Password harus terdiri dari huruf kapital, huruf kecil, dan angka";
+                }
+            }
+        });
+
+        var passwordInput = document.getElementById("user-password");
+        var confirmPasswordInput = document.getElementById("confirm-password");
+        var passwordMatchErrorElement = document.getElementById("password-match-error");
+
+        function checkPasswordMatch() {
+            var password = passwordInput.value;
+            var confirmPassword = confirmPasswordInput.value;
+
+            if (password === confirmPassword) {
+                passwordMatchErrorElement.textContent = "";
+            } else {
+                passwordMatchErrorElement.textContent;
+            }
+        }
+
+        passwordInput.addEventListener("input", checkPasswordMatch);
+        confirmPasswordInput.addEventListener("input", checkPasswordMatch);
+    </script>
+
     {% include "footer.html" %}
 </body>
 </html>

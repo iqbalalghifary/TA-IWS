@@ -430,6 +430,7 @@ def upload():
         # Lakukan pengecekan judul
         title_messages, word_count_result, note = cek_judul(pdf_path)
 
+        #Lakukan pengecekan kaprodi
         status_kaprodi, ket_status_kaprodi, status_nip_kaprodi, ket_status_nip_kaprodi = deteksi_nama(pdf_path)
 
         user_name = current_user.full_name
