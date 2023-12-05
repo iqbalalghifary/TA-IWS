@@ -1,10 +1,12 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, session
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
+from flask import send_from_directory #untuk simpan report di server
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
+from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import relationship
 from werkzeug.security import generate_password_hash, check_password_hash
-from flask_migrate import Migrate
 from passlib.hash import bcrypt
 import os
 import fitz
@@ -12,6 +14,9 @@ import re
 import psycopg2
 import io
 from dotenv import load_dotenv #nambahin env
+import time
+from datetime import datetime  # Import the datetime module
+
 
 app = Flask(__name__)
 load_dotenv() #load .env
@@ -21,10 +26,12 @@ app.config['SESSION_TYPE'] = 'filesystem'
 
 # Database configurations
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get("DATABASE_URL")
+
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 uploads_directory = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'static/uploads')
+reports_directory = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'static/reports')
 
 # Inisialisasi Flask-Login
 # LoginManager menyediakan alat yang sangat membantu dalam manajemen autentikasi pengguna
@@ -41,6 +48,19 @@ class User(db.Model, UserMixin):
 
     def get_id(self):
         return str(self.id)
+    
+    reports = relationship('Report', backref='user', lazy=True)
+
+# Model report
+class Report(db.Model):
+    id_report = db.Column(db.Integer, primary_key=True)
+    path_file = db.Column(db.String(255), nullable=False)
+    tanggal = db.Column(db.Date, nullable=False)
+    title_report = db.Column(db.String(255), nullable=False)
+    status = db.Column(db.String(50), nullable=False)
+
+    # Foreign key to link with User
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
 
 # Model lecturer 
 class Lecturer(db.Model):
@@ -87,9 +107,13 @@ def logout():
     session['logged_in'] = False  # Mengubah status login dalam sesi
     return redirect(url_for('login'))
 
-@app.route('/lupa_password')
+@app.route('/send_email')
 def lupa_password():
-    return render_template('lupa_password.html')
+    return render_template('send_email.html')
+
+@app.route('/change_password')
+def change_password():
+    return render_template('change_password.html')
     
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
@@ -122,73 +146,7 @@ def dashboard():
         return redirect(url_for('login'))
     return render_template('dashboard.html')
 
-def deteksi_nama(pdf_path):
-    try:
-        start_keyword = "ketua"
-        pdf_document = fitz.open(pdf_path)
-        match_found = False
-
-        for page_num in range(pdf_document.page_count):
-            page = pdf_document[page_num]
-            page_text = page.get_text()
-
-            start_index = page_text.lower().find(start_keyword)
-            if start_index != -1:
-                extracted_text = page_text[start_index + len(start_keyword):].strip()
-                print(f": {extracted_text}")
-
-                pattern_santi = r'Santi Sundari, S\.Si\., M\.T\.'
-                pattern_ghifari = r'Ghifari Munawar, S\.Kom\., M\.T\.'
-
-                match_santi = re.search(pattern_santi, extracted_text)
-                match_ghifari = re.search(pattern_ghifari, extracted_text)
-
-            if match_santi:
-                match_found = True
-                # Extract text after the matched pattern
-                remaining_text = extracted_text[match_santi.end():]
-                # Extract only numerical values using regular expression
-                numbers = re.findall(r'\d+', remaining_text)
-                status_kaprodi = "PASS"
-                ket_status_kaprodi = f"Penulisan Ketua Prodi sudah jurusan sesuai data dosen!"
-                print(f"nama yang ditemukan: {remaining_text}")
-                print(f"Nama ditemukan di halaman {page_num + 1}: Santi Sundari, S.Si., M.T.")
-                print(f"Angka setelah nama: {numbers}")
-
-            if match_ghifari:
-                match_found = True
-                remaining_text = extracted_text[match_ghifari.end():]
-                numbers = re.findall(r'\d+', remaining_text)
-                status_kaprodi = "PASS"
-                ket_status_kaprodi = f"Penulisan Ketua Prodi sudah sesuai dengan data dosen!"
-                print(f"nama yang ditemukan: {remaining_text}")
-                print(f"Nama ditemukan di halaman {page_num + 1}: Ghifari Munawar, S.Kom., M.T.")
-                print(f"Angka setelah nama: {numbers}")
-
-            # Mencocokkan nomor dengan nip pada tabel
-            for number in numbers:
-                lecturer = Lecturer.query.filter_by(nip=number).first()
-                if lecturer:
-                    print(f"NIP {number} sudah benar. Nama: {lecturer.full_name}")
-                    status_nip_kaprodi = "PASS"
-                    ket_status_nip_kaprodi = f"NIP Ketua Prodi sudah tepat!"
-                else:
-                    print(f"NIP {number} tidak ditemukan dalam tabel lecturer.")
-                    status_nip_kaprodi = "FAIL"
-                    ket_status_nip_kaprodi = f"NIP Ketua Prodi belum tepat!"
-
-        pdf_document.close()
-
-        if not match_found:
-            print("Nama tidak ditemukan dalam file PDF.")
-            status_kaprodi = "PASS"
-            ket_status_kaprodi = f"Penulisan Ketua Prodi belum sesuai dengan data dosen!"
-        
-        return  status_kaprodi, ket_status_kaprodi, status_nip_kaprodi, ket_status_nip_kaprodi
-
-    except Exception as e:
-        return str(e)
-
+# Fungsi Pengecekan Judul
 def cek_judul(pdf_path):
     doc = fitz.open(pdf_path) #buka pdf
 
@@ -206,7 +164,7 @@ def cek_judul(pdf_path):
                 # Jika menemukan baris baru kosong, tambahkan bagian sebelumnya ke list results
                 if previous_lines:
                     result = ' '.join(previous_lines)
-                    print(result)
+                    print(result) # print judul yang terdeteksi
 
                     # Hitung jumlah kata pada variabel result
                     word_count = len(result.split())
@@ -215,12 +173,16 @@ def cek_judul(pdf_path):
                     # Berikan status sesuai jumlah kata
                     if 12 <= word_count <= 20:
                         word_count_result = "PASS"
-                        note = f"Penulisan Judul sudah sesuai aturan"
+                        print(word_count_result) # ini untuk liat hasil di terminal aja
+                        note = f"Jumlah kata yang terdeteksi {word_count} kata. Penulisan judul sudah sesuai aturan"
+                        print(note) # ini untuk liat hasil di terminal aja
                     elif word_count == 1:
                         word_count_result = "Perbaiki posisi penomoran halaman"
                     elif word_count > 20 or word_count < 12:
                         word_count_result = "FAIL"
-                        note = f"Penulisan Judul belum sesuai aturan. pada halaman persetujuan seharusnya terdiri dari 12-20 kata. Jumlah kata yang terdeteksi saat ini {word_count} kata."
+                        print(word_count_result) # ini untuk liat hasil di terminal aja
+                        note = f"Jumlah kata yang terdeteksi {word_count} kata. Penulisan Judul belum sesuai aturan"
+                        print(note) # ini untuk liat hasil di terminal aja
                     doc.close()
                     return results, word_count_result, note  # Mengembalikan list hasil
                 previous_lines = []
@@ -229,6 +191,74 @@ def cek_judul(pdf_path):
 
     doc.close()
     results.append(f"Tidak ditemukan baris baru kosong.")
+
+def cek_identitas_kaprodi(pdf_path):
+    try:
+        start_keyword = "ketua" 
+        pdf_document = fitz.open(pdf_path)
+        match_found = False
+
+        for page_num in range(pdf_document.page_count):
+            page = pdf_document[page_num]
+            page_text = page.get_text()
+
+            start_index = page_text.lower().find(start_keyword)
+            if start_index != -1:
+                extracted_text = page_text[start_index + len(start_keyword):].strip()
+                print(f"lingkup text untuk pencarian kaprodi: {extracted_text}") 
+
+                pattern_santi = r'Santi Sundari, S\.Si\., M\.T\.'
+                pattern_ghifari = r'Ghifari Munawar, S\.Kom\., M\.T\.'
+
+                match_santi = re.search(pattern_santi, extracted_text)
+                match_ghifari = re.search(pattern_ghifari, extracted_text)
+
+            if match_santi:
+                match_found = True
+                # Extract text after the matched pattern
+                remaining_text = extracted_text[match_santi.end():]
+                # Extract only numerical values using regular expression
+                numbers = re.findall(r'\d+', remaining_text)
+                status_kaprodi = "PASS"
+                ket_status_kaprodi = f"Nama Ketua Prodi sesuai dengan data dosen!"
+                print(f"nama yang ditemukan: {remaining_text}")
+                print(f"Nama ditemukan di halaman {page_num + 1}: Santi Sundari, S.Si., M.T.")
+                print(f"Angka setelah nama: {numbers}")
+
+            if match_ghifari:
+                match_found = True
+                remaining_text = extracted_text[match_ghifari.end():]
+                numbers = re.findall(r'\d+', remaining_text)
+                status_kaprodi = "PASS"
+                ket_status_kaprodi = f"Nama Ketua Prodi sesuai dengan data dosen!"
+                print(f"nama yang ditemukan: {remaining_text}")
+                print(f"Nama ditemukan di halaman {page_num + 1}: Ghifari Munawar, S.Kom., M.T.")
+                print(f"Angka setelah nama: {numbers}")
+        
+            # Mencocokkan nomor dengan nip pada tabel
+            for number in numbers:
+                lecturer = Lecturer.query.filter_by(nip=number).first()
+                if lecturer:
+                    print(f"NIP {number} sudah benar. Nama: {lecturer.full_name}")
+                    status_nip_kaprodi = "PASS"
+                    ket_status_nip_kaprodi = f"NIP Ketua Prodi sudah tepat!"
+                else:
+                    print(f"NIP {number} tidak ditemukan dalam tabel lecturer.")
+                    status_nip_kaprodi = "FAIL"
+                    ket_status_nip_kaprodi = f"NIP Ketua Prodi belum tepat!"
+
+        if not match_found:
+            print("Nama tidak ditemukan dalam file PDF.")
+            status_kaprodi = "FAIL"
+            ket_status_kaprodi = f"Nama Ketua Prodi belum sesuai dengan data dosen!"
+        
+        pdf_document.close()
+        
+        return  status_kaprodi, ket_status_kaprodi, status_nip_kaprodi, ket_status_nip_kaprodi
+
+    except Exception as e:
+        return str(e)
+
 
 def cek_dosbing(pdf_path, keyword_start, keyword_end, database_url):
     # Set the start and end keywords
@@ -406,6 +436,55 @@ def cek_nip_dosbing(pdf_path, start_keyword, end_keyword, database_url):
         print("Keywords not found in the extracted text.")
     return status_nip_dosbing, ket_nip_dosbing
 
+@app.route('/save_pdf', methods=['POST'])
+def save_pdf():
+    pdf_file = request.files['pdf_file']
+
+    if pdf_file:
+        # Membuat nama file PDF yang unik dengan timestamp
+        timestamp = int(time.time())
+        pdf_filename = f"generated_report_{timestamp}.pdf" #inipenamaan file nya perlu diganti 
+        pdf_path = os.path.join(reports_directory, pdf_filename)
+
+        # Simpan file PDF di direktori reports_directory
+        pdf_file.save(pdf_path)
+
+        # Insert data into the Report table
+        report = Report(
+            path_file=f"{url_for('static', filename='reports')}/{pdf_filename}",
+            tanggal=datetime.now(),
+            title_report="Your Title Here",  # You need to set an appropriate title
+            status="Pending",  # You may set the initial status as "Pending" or customize as needed
+            user=current_user  # Assuming you have the current_user object available
+        )
+
+        db.session.add(report)
+        db.session.commit()
+
+        return jsonify({'filename': pdf_filename})
+    else:
+        return jsonify({'error': 'No PDF file received'}), 400
+
+@app.route('/history')
+@login_required
+def history():
+    # Fetch all reports for the current user from the database
+    user_reports = Report.query.filter_by(user_id=current_user.id).all()
+
+    # Format the timestamp to a readable string
+    formatted_reports = [
+        {
+            'id': report.id_report,
+            'title': report.title_report,
+            'status': report.status,
+            'file': report.path_file,
+            'tanggal': report.tanggal.strftime('%d-%m-%Y %H:%M:%S')  # Format the timestamp
+        }
+        for report in user_reports
+    ]
+
+    return render_template('history.html', reports=formatted_reports)
+
 @app.route('/upload', methods=['POST'])
 def upload():
     uploaded_file = request.files['pdf_file']
@@ -414,27 +493,28 @@ def upload():
         # Simpan file PDF yang diunggah di server
         pdf_path = os.path.join(uploads_directory, uploaded_file.filename)
         uploaded_file.save(pdf_path)
+        database_url = os.environ.get("DATABASE_URL")
+
+        # mengambil nama dan nim user untuk ditampilkan pada report
+        user_name = current_user.full_name
+        user_nim = current_user.student_id
 
         # Set the start and end keywords untuk cek nama dosbing
         start_keyword = 'Pembimbing'
         end_keyword = 'NIP'
 
-        database_url = os.environ.get("DATABASE_URL")
+        # Lakukan pengecekan judul
+        title_messages, word_count_result, note = cek_judul(pdf_path)
 
         # Lakukan pengecekan nama dosbing
         status_nama_dosbing, keterangan = cek_dosbing(pdf_path, start_keyword, end_keyword, database_url)
 
         # Lakukan pengecekan nip dosbing
         status_nip_dosbing, ket_nip_dosbing = cek_nip_dosbing(pdf_path, start_keyword, end_keyword, database_url)
-        
-        # Lakukan pengecekan judul
-        title_messages, word_count_result, note = cek_judul(pdf_path)
+       
 
         #Lakukan pengecekan kaprodi
-        status_kaprodi, ket_status_kaprodi, status_nip_kaprodi, ket_status_nip_kaprodi = deteksi_nama(pdf_path)
-
-        user_name = current_user.full_name
-        user_nim = current_user.student_id
+        status_kaprodi, ket_status_kaprodi, status_nip_kaprodi, ket_status_nip_kaprodi = cek_identitas_kaprodi(pdf_path)
 
         # Lakukan pengecekan kaprodi
         # deteksi_nama(pdf_path)

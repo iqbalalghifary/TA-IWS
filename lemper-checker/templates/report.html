@@ -102,7 +102,7 @@
             doc.text(status_nip_kaprodi, doc.internal.pageSize.width - 20, 138, { align: 'right' });
 
             doc.setFontSize(10);
-            doc.setFont('arial');
+            doc.setFont('times');
             doc.setTextColor(0, 0, 0);
             doc.text(note, 10, 75);
             doc.text(keterangan, 10, 92);
@@ -133,8 +133,29 @@
             var pdfBlob = doc.output('blob');
             var pdfUrl = URL.createObjectURL(pdfBlob);
 
+            // Membuat nama file PDF yang unik dengan timestamp
+            var timestamp = new Date().getTime();
+            var pdfFileName = 'generated_report_' + timestamp + '.pdf';
+
+            // Menggunakan FormData untuk membuat objek form data
+            var formData = new FormData();
+            formData.append('pdf_file', pdfBlob, pdfFileName);
+
             var pdfPreview = document.getElementById('pdf-preview');
             pdfPreview.src = pdfUrl;  // Set the src attribute to the new PDF URL
+
+            // Menggunakan Fetch API untuk mengirimkan request POST ke endpoint /save_pdf
+            fetch('/save_pdf', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('File saved successfully:', data.filename);
+            })
+            .catch(error => {
+                console.error('Error saving file:', error);
+            });
         }
     </script>
 </body>
