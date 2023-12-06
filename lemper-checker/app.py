@@ -14,7 +14,6 @@ import re
 import psycopg2
 import io
 from dotenv import load_dotenv #nambahin env
-import time
 from datetime import datetime  # Import the datetime module
 
 
@@ -55,7 +54,7 @@ class User(db.Model, UserMixin):
 class Report(db.Model):
     id_report = db.Column(db.Integer, primary_key=True)
     path_file = db.Column(db.String(255), nullable=False)
-    tanggal = db.Column(db.Date, nullable=False)
+    tanggal = db.Column(db.DateTime, nullable=False)
     title_report = db.Column(db.String(255), nullable=False)
     status = db.Column(db.String(50), nullable=False)
 
@@ -139,12 +138,35 @@ def signup():
 
     return render_template('signup.html')
 
+# Menampilkan halaman history
 @app.route('/dashboard')
 @login_required
 def dashboard():
     if not session.get('logged_in'):
         return redirect(url_for('login'))
-    return render_template('dashboard.html')
+
+    # Fetch all reports for the current user from the database
+    user_reports = Report.query.filter_by(user_id=current_user.id).all()
+
+    # Format the timestamp to a readable string
+    formatted_reports = [
+        {
+            'id': report.id_report,
+            'title': report.title_report,
+            'status': report.status,
+            'file': report.path_file,
+            'tanggal': report.tanggal
+        }
+        for report in user_reports
+    ]
+
+    return render_template('dashboard.html', reports=formatted_reports)
+
+# Menampilkan halaman input file pdf
+@app.route('/input_file')
+@login_required
+def input_file(): 
+    return render_template('input_file.html')
 
 # Fungsi Pengecekan Judul
 def cek_judul(pdf_path):
@@ -198,6 +220,12 @@ def cek_identitas_kaprodi(pdf_path):
         pdf_document = fitz.open(pdf_path)
         match_found = False
 
+        status_kaprodi = "FAIL"
+        ket_status_kaprodi = ""
+        status_nip_kaprodi = "FAIL"
+        ket_status_nip_kaprodi = ""
+        numbers = []
+
         for page_num in range(pdf_document.page_count):
             page = pdf_document[page_num]
             page_text = page.get_text()
@@ -213,48 +241,46 @@ def cek_identitas_kaprodi(pdf_path):
                 match_santi = re.search(pattern_santi, extracted_text)
                 match_ghifari = re.search(pattern_ghifari, extracted_text)
 
-            if match_santi:
-                match_found = True
-                # Extract text after the matched pattern
-                remaining_text = extracted_text[match_santi.end():]
-                # Extract only numerical values using regular expression
-                numbers = re.findall(r'\d+', remaining_text)
-                status_kaprodi = "PASS"
-                ket_status_kaprodi = f"Nama Ketua Prodi sesuai dengan data dosen!"
-                print(f"nama yang ditemukan: {remaining_text}")
-                print(f"Nama ditemukan di halaman {page_num + 1}: Santi Sundari, S.Si., M.T.")
-                print(f"Angka setelah nama: {numbers}")
+                if match_santi:
+                    match_found = True
+                    remaining_text = extracted_text[match_santi.end():]
+                    numbers = re.findall(r'\d+', remaining_text)
+                    status_kaprodi = "PASS"
+                    ket_status_kaprodi = f"Nama Ketua Prodi sesuai dengan data dosen!"
+                    print(f"nama yang ditemukan: {remaining_text}")
+                    print(f"Nama ditemukan di halaman {page_num + 1}: Santi Sundari, S.Si., M.T.")
+                    print(f"Angka setelah nama: {numbers}")
 
-            if match_ghifari:
-                match_found = True
-                remaining_text = extracted_text[match_ghifari.end():]
-                numbers = re.findall(r'\d+', remaining_text)
-                status_kaprodi = "PASS"
-                ket_status_kaprodi = f"Nama Ketua Prodi sesuai dengan data dosen!"
-                print(f"nama yang ditemukan: {remaining_text}")
-                print(f"Nama ditemukan di halaman {page_num + 1}: Ghifari Munawar, S.Kom., M.T.")
-                print(f"Angka setelah nama: {numbers}")
-        
-            # Mencocokkan nomor dengan nip pada tabel
-            for number in numbers:
-                lecturer = Lecturer.query.filter_by(nip=number).first()
-                if lecturer:
-                    print(f"NIP {number} sudah benar. Nama: {lecturer.full_name}")
-                    status_nip_kaprodi = "PASS"
-                    ket_status_nip_kaprodi = f"NIP Ketua Prodi sudah tepat!"
-                else:
-                    print(f"NIP {number} tidak ditemukan dalam tabel lecturer.")
-                    status_nip_kaprodi = "FAIL"
-                    ket_status_nip_kaprodi = f"NIP Ketua Prodi belum tepat!"
+                elif match_ghifari:
+                    match_found = True
+                    remaining_text = extracted_text[match_ghifari.end():]
+                    numbers = re.findall(r'\d+', remaining_text)
+                    status_kaprodi = "PASS"
+                    ket_status_kaprodi = f"Nama Ketua Prodi sesuai dengan data dosen!"
+                    print(f"nama yang ditemukan: {remaining_text}")
+                    print(f"Nama ditemukan di halaman {page_num + 1}: Ghifari Munawar, S.Kom., M.T.")
+                    print(f"Angka setelah nama: {numbers}")
+
+        # Mencocokkan nomor dengan nip pada tabel
+        for number in numbers:
+            lecturer = Lecturer.query.filter_by(nip=number).first()
+            if lecturer:
+                print(f"NIP {number} sudah benar. Nama: {lecturer.full_name}")
+                status_nip_kaprodi = "PASS"
+                ket_status_nip_kaprodi = f"NIP Ketua Prodi sudah tepat!"
+            else:
+                print(f"NIP {number} tidak ditemukan dalam tabel lecturer.")
+                status_nip_kaprodi = "FAIL"
+                ket_status_nip_kaprodi = f"NIP Ketua Prodi belum tepat!"
 
         if not match_found:
             print("Nama tidak ditemukan dalam file PDF.")
             status_kaprodi = "FAIL"
-            ket_status_kaprodi = f"Nama Ketua Prodi belum sesuai dengan data dosen!"
+            ket_status_kaprodi = f"Nama Ketua Prodi belum sesuai dengan data dosen."
         
         pdf_document.close()
         
-        return  status_kaprodi, ket_status_kaprodi, status_nip_kaprodi, ket_status_nip_kaprodi
+        return status_kaprodi, ket_status_kaprodi, status_nip_kaprodi, ket_status_nip_kaprodi
 
     except Exception as e:
         return str(e)
@@ -441,9 +467,8 @@ def save_pdf():
     pdf_file = request.files['pdf_file']
 
     if pdf_file:
-        # Membuat nama file PDF yang unik dengan timestamp
-        timestamp = int(time.time())
-        pdf_filename = f"generated_report_{timestamp}.pdf" #inipenamaan file nya perlu diganti 
+        # Membuat nama file PDF yang unik dengan user name
+        pdf_filename = f"report_{current_user.full_name}.pdf" #inipenamaan file nya perlu diganti 
         pdf_path = os.path.join(reports_directory, pdf_filename)
 
         # Simpan file PDF di direktori reports_directory
@@ -464,26 +489,6 @@ def save_pdf():
         return jsonify({'filename': pdf_filename})
     else:
         return jsonify({'error': 'No PDF file received'}), 400
-
-@app.route('/history')
-@login_required
-def history():
-    # Fetch all reports for the current user from the database
-    user_reports = Report.query.filter_by(user_id=current_user.id).all()
-
-    # Format the timestamp to a readable string
-    formatted_reports = [
-        {
-            'id': report.id_report,
-            'title': report.title_report,
-            'status': report.status,
-            'file': report.path_file,
-            'tanggal': report.tanggal.strftime('%d-%m-%Y %H:%M:%S')  # Format the timestamp
-        }
-        for report in user_reports
-    ]
-
-    return render_template('history.html', reports=formatted_reports)
 
 @app.route('/upload', methods=['POST'])
 def upload():

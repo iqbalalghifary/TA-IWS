@@ -1,20 +1,62 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <meta charset="utf-8" />
-    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <title>Lemper Checker App</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <!-- Bootstrap CSS -->
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css">
+    <title>Lemper Checker App</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Arial', sans-serif;
+        }
+
+        .header, .footer {
+            background-color: #ffffff;
+            padding: 10px;
+            text-align: center;
+        }
+
+        .background-section {
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-image: url('static/img/bg-polban.jpeg');
+            background-size: cover;
+            background-position: center;
+        }
+
+        .content {
+            text-align: center;
+            padding: 20px;
+            color: #ffffff; /* Warna teks putih */
+        }
+
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 20px;
+            font-weight: bold;
+            color: #ffffff; /* Warna teks putih */
+        }
+
+        p {
+            font-size: 1.2em;
+            color: #ffffff; /* Warna teks putih */
+        }
+    </style>
 </head>
 <body>
-    {% include "header.html" %}
-
-    <div class="container mt-5">
-        <h1>Welcome to My Lemper Ceker App</h1>
-        <p>This is the home page.</p>
+    
+        {% include "header.html" %}
+    
+    <div class="background-section">
+        <div class="content">
+            <h1><strong>Aplikasi Lemper Checker</strong></h1>
+            <p>Aplikasi yang menyediakan pengecekan halaman persetujuan KP/PKL anda</p>
+        </div>
     </div>
-
-    {% include "footer.html" %}
 </body>
 </html>

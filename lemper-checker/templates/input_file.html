@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css">
+    <!-- Aktifkan Bootstrap JavaScript dan jQuery jika belum ada -->
+    <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/upload-form.css') }}">
+    <title>Dashboard</title>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-light bg-light">
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarToggler" aria-controls="navbarToggler" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <a class="navbar-brand" href="#">Lemper Checker App</a>
+
+        <div class="collapse navbar-collapse" id="navbarToggler">
+            <ul class="navbar-nav ml-auto">
+                <!-- Menu Profil User -->
+                <li class="nav-item">
+                    <a class="nav-link" href="/profile">Profil</a>
+                </li>
+                <!-- Menu Logout -->
+                <li class="nav-item">
+                    <a class="nav-link" href="/logout">Logout</a>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <form action="/upload" method="POST" enctype="multipart/form-data" id="upload-form">
+        <div class="input-container">
+            <div class="inner-input-container pdf-container">
+                <div class="input-div-pdf">
+                    <!-- name sbg key untuk req ke BE -->
+                    <input type="file" name="pdf_file" accept=".pdf">
+                </div>
+            </div>
+        </div>
+        <div class="button-container">
+            <input type="submit" value="Upload" class="validate-button">
+        </div>
+    </form>
+</body>
+</html>

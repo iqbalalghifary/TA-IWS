@@ -133,9 +133,9 @@
             var pdfBlob = doc.output('blob');
             var pdfUrl = URL.createObjectURL(pdfBlob);
 
-            // Membuat nama file PDF yang unik dengan timestamp
-            var timestamp = new Date().getTime();
-            var pdfFileName = 'generated_report_' + timestamp + '.pdf';
+            // Membuat nama file PDF yang unik dengan nama user
+            var username = '{{ user_name }}';
+            var pdfFileName = 'report_' + username + '.pdf';
 
             // Menggunakan FormData untuk membuat objek form data
             var formData = new FormData();
