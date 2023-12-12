@@ -9,13 +9,8 @@
     <script src="{{ url_for('static', filename='jsPDF-master/dist/jspdf.umd.min.js') }}"></script>
 </head>
 <body>
-    <h1>Generate PDF using jsPDF</h1>
-    <div id="message-container">
-        {% for message in title_messages %}
-            <p>{{ message }}</p>
-        {% endfor %}
-    </div>
-    <button onclick="generatePDF()">Generate PDF</button>
+    <!-- <h1 style="text-align: center;">Report hasil pengecekan</h1> -->
+    {% include "header_user.html" %}
 
     <!-- Add an iframe for PDF preview -->
     <iframe id="pdf-preview" width="100%" height="600px" style="border: 1px solid #ddd;"></iframe>
@@ -38,14 +33,22 @@
             // Create a new jsPDF instance
             doc = new jsPDF();
             doc.setFont('helvetica');
+
+            // Add left margin
+            var leftMargin = 10;
+            
+            // Add right margin
+            var rightMargin = doc.internal.pageSize.width - 10;
+
             var messageContainer = document.getElementById('message-container');
 
-            var logoWidth = 50;
+            var textLeft = leftMargin;
+            var logoWidth = 25;
             var logoHeight = 30;
-            var logoImage = '{{ url_for("static", filename="img/lemper-logo.png") }}';
-            doc.addImage(logoImage, 'PNG', doc.internal.pageSize.width - logoWidth - 10, 5, logoWidth, logoHeight);
+            var logoImage = '{{ url_for("static", filename="img/logo-polban.png") }}';
+            doc.addImage(logoImage, 'PNG', rightMargin - logoWidth, 5, logoWidth, logoHeight);
 
-            var textLeft = 10;
+            var textLeft = leftMargin;
             var textTop = 20;
             doc.setFontSize(12);
             doc.text('User  : {{ user_name }}', textLeft, textTop);
@@ -62,72 +65,73 @@
             doc.text('Date  : ' + formattedDate, textLeft, textTop + 10);
 
             doc.setFontSize(16);
-            doc.text('Halaman Persetujuan', 10, 50);
-            doc.line(10, 53, 200, 53);
+            doc.text('Halaman Persetujuan', leftMargin, 50);
+            doc.line(leftMargin, 53, rightMargin, 53);
 
             doc.setTextColor(255, 0, 0);
             doc.setFontSize(12);
-            doc.text('Validity Report', 10, 60);
+            doc.text('Validity Report', leftMargin, 60);
 
             doc.setTextColor(0, 0, 0);
-            doc.line(10, 63, 200, 63);
+            doc.line(leftMargin, 63, rightMargin, 63);
 
+            
             var word_count_result = "{{ word_count_result }}";
-            var note = "{{ note }}";
+            var ket_status_judul = "{{ ket_status_judul }}";
             var status_nama_dosbing = "{{ status_nama_dosbing }}";
             var keterangan = "{{ keterangan }}";
             var status_nip_dosbing = "{{ status_nip_dosbing }}";
             var ket_nip_dosbing = "{{ ket_nip_dosbing }}";
             var status_kaprodi = "{{ status_kaprodi }}";
-            var ket_status_kaprodi = "{{ ket_status_kaprodi }}";
+            var ket_status_kaprodi = "{{ ket_status_kaprodi }}"; 
             var status_nip_kaprodi = "{{ status_nip_kaprodi }}";
             var ket_status_nip_kaprodi = "{{ ket_status_nip_kaprodi }}";
-
+            
             var passColor = [0, 128, 0];
             var failColor = [255, 0, 0];
 
             setTextColor(word_count_result, passColor, failColor);
-            doc.text(word_count_result, doc.internal.pageSize.width - 20, 70, { align: 'right' });
+            doc.text(word_count_result, rightMargin, 77, { align: 'right' });
 
             setTextColor(status_nama_dosbing, passColor, failColor);
-            doc.text(status_nama_dosbing, doc.internal.pageSize.width - 20, 87, { align: 'right' });
+            doc.text(status_nama_dosbing, rightMargin, 104, { align: 'right' });
 
             setTextColor(status_nip_dosbing, passColor, failColor);
-            doc.text(status_nip_dosbing, doc.internal.pageSize.width - 20, 104, { align: 'right' });
+            doc.text(status_nip_dosbing, rightMargin, 131, { align: 'right' });
 
             setTextColor(status_kaprodi, passColor, failColor);
-            doc.text(status_kaprodi, doc.internal.pageSize.width - 20, 121, { align: 'right' });
+            doc.text(status_kaprodi,rightMargin, 158, { align: 'right' });
 
             setTextColor(status_nip_kaprodi, passColor, failColor);
-            doc.text(status_nip_kaprodi, doc.internal.pageSize.width - 20, 138, { align: 'right' });
+            doc.text(status_nip_kaprodi, rightMargin, 185, { align: 'right' });
 
             doc.setFontSize(10);
             doc.setFont('times');
             doc.setTextColor(0, 0, 0);
-            doc.text(note, 10, 75);
-            doc.text(keterangan, 10, 92);
-            doc.text(ket_nip_dosbing, 10, 109);
-            doc.text(ket_status_kaprodi, 10, 126);
-            doc.text(ket_status_nip_kaprodi, 10, 143);
+            doc.text(ket_status_judul, leftMargin, 75);
+            doc.text(keterangan, leftMargin, 102);
+            doc.text(ket_nip_dosbing, leftMargin, 129);
+            doc.text(ket_status_kaprodi, leftMargin, 156);
+            doc.text(ket_status_nip_kaprodi, leftMargin, 183);
 
             doc.setTextColor(0, 0, 0);
             doc.setFontSize(12);
             doc.setFont('helvetica','bold');
             
-            doc.text('JUDUL', 10, 70);
-            doc.line(10, 80, 200, 80);
+            doc.text('JUDUL', leftMargin, 70);
+            doc.line(leftMargin, 90, rightMargin, 90);
 
-            doc.text('NAMA LENGKAP DAN GELAR PEMBIMBING JURUSAN', 10, 87);
-            doc.line(10, 97, 200, 97);
+            doc.text('NAMA LENGKAP DAN GELAR PEMBIMBING JURUSAN', 10, 97);
+            doc.line(leftMargin, 117, rightMargin, 117);
 
-            doc.text('NIP PEMBIMBING JURUSAN', 10, 104);
-            doc.line(10, 114, 200, 114);
+            doc.text('NIP PEMBIMBING JURUSAN', 10, 124);
+            doc.line(leftMargin, 144, rightMargin, 144);
 
-            doc.text('NAMA LENGKAP DAN GELAR KETUA PRODI', 10, 121);
-            doc.line(10, 131, 200, 131);
+            doc.text('NAMA LENGKAP DAN GELAR KETUA PRODI', 10, 151);
+            doc.line(leftMargin, 171, rightMargin, 171);
 
-            doc.text('NIP KETUA PRODI', 10, 138);
-            doc.line(10, 148, 200, 148);
+            doc.text('NIP KETUA PRODI', 10, 178);
+            doc.line(leftMargin, 198, rightMargin, 198);
 
             // Replace the following code to set the src attribute of the iframe
             var pdfBlob = doc.output('blob');
@@ -157,6 +161,7 @@
                 console.error('Error saving file:', error);
             });
         }
+        window.onload = generatePDF;
     </script>
 </body>
 </html>

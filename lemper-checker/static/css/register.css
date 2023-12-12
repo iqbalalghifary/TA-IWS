@@ -3,8 +3,12 @@ a {
 }
 
 body {
-  background: -webkit-linear-gradient(bottom, #071c34, #144361);
-  background-repeat: no-repeat;
+  background: url("/static/img/slide_polban.jpg") no-repeat center center fixed;
+  background-size: cover;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  margin: 0;
 }
 
 label {

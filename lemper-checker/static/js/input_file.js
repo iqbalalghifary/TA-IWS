@@ -38,25 +38,34 @@ fileInput.addEventListener("change", e => {
 
 uploadButton.addEventListener("click", () => {
     let isFileUploaded = fileInput.value;
-    if (isFileUploaded != '') {
-        if (fileFlag == 0) {
+    if (isFileUploaded !== '') {
+        if (fileFlag === 0) {
             fileFlag = 1;
-            var width = 0;
-            var id = setInterval(frame, 50);
-            function frame() {
-                if (width >= 390) {
-                    clearInterval(id);
-                    uploadButton.innerHTML = `<span class="material-icons-outlined upload-button-icon"> check_circle </span> Uploaded`;
 
-                    // Delay for 2 seconds before redirecting to /upload
-                    setTimeout(() => {
-                        window.location.href = '/upload';
-                    }, 2000);
-                } else {
-                    width += 5;
-                    progressBar.style.width = width + "px";
-                }
-            }
+            // Display loading message or spinner during processing
+            uploadButton.innerHTML = 'Processing...';
+
+            // Create FormData object to send the file
+            let formData = new FormData();
+            formData.append('pdf_file', fileInput.files[0]);
+
+            // Send asynchronous request to the server
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json()) // assuming the server returns JSON
+            .then(data => {
+                // Handle the response data as needed
+                console.log(data);
+                // Update UI or redirect as necessary
+                // For example, redirect after processing:
+                // window.location.href = '/report';
+            })
+            .catch(error => {
+                console.error('Error during file upload:', error);
+                // Handle error, e.g., display an error message to the user
+            });
         }
     } else {
         cannotUploadMessage.style.cssText = "display: flex; animation: fadeIn linear 1.5s;";

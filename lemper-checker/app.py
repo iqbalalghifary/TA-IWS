@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, current_app
 from flask import send_from_directory #untuk simpan report di server
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from flask_migrate import Migrate
@@ -16,15 +16,36 @@ import io
 from dotenv import load_dotenv #nambahin env
 from datetime import datetime  # Import the datetime module
 
+from flask_mail import Mail, Message
+from itsdangerous import URLSafeTimedSerializer
+
+# Muat konfigurasi dari file .env
+load_dotenv()
 
 app = Flask(__name__)
 load_dotenv() #load .env
 
+# Configuring Flask-Mail
+app.config['MAIL_SERVER'] = os.environ.get("MAIL_SERVER")
+app.config['MAIL_PORT'] = os.environ.get("MAIL_PORT")
+app.config['MAIL_USE_TLS'] = os.environ.get("MAIL_USE_TLS")
+app.config['MAIL_USE_SSL'] = os.environ.get("MAIL_USE_SSL")
+app.config['MAIL_USERNAME'] = os.environ.get("MAIL_USERNAME")
+app.config['MAIL_PASSWORD'] = os.environ.get("MAIL_PASSWORD")
+app.config['MAIL_DEFAULT_SENDER'] = os.environ.get("MAIL_DEFAULT_SENDER")
+app.config['MAIL_MAX_EMAILS'] = os.environ.get("MAIL_MAX_EMAILS")
+app.config['MAIL_SUPPRESS_SEND'] = os.environ.get("MAIL_SUPPRESS_SEND")
+
+mail = Mail(app)
+
 app.secret_key = os.environ.get("SECRET_KEY")
+app.config['SECURITY_PASSWORD_SALT'] = 'your_secret_salt_value'
+
 app.config['SESSION_TYPE'] = 'filesystem'
 
 # Database configurations
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get("DATABASE_URL")
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get("DATABASE_URL") or 'postgresql://postgres:1234@localhost/lemper'
+
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
@@ -75,6 +96,14 @@ def load_user(user_id):
 def home():
     return render_template('index.html')
 
+@app.route('/send_email')
+def send_email():
+    return render_template('send_email.html')
+
+@app.route('/change_password')
+def change_password():
+    return render_template('change_password.html')
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -106,14 +135,86 @@ def logout():
     session['logged_in'] = False  # Mengubah status login dalam sesi
     return redirect(url_for('login'))
 
-@app.route('/send_email')
-def lupa_password():
-    return render_template('send_email.html')
-
-@app.route('/change_password')
-def change_password():
-    return render_template('change_password.html')
+# Function to generate a reset password token
+def generate_reset_token(email):
+    serializer = URLSafeTimedSerializer(current_app.config['SECRET_KEY'])
+    return serializer.dumps(email, salt=current_app.config['SECURITY_PASSWORD_SALT'])
     
+# Function to decode a reset password token
+def decode_reset_token(token):
+    serializer = URLSafeTimedSerializer(current_app.config['SECRET_KEY'])
+    try:
+        email = serializer.loads(token, salt=current_app.config['SECURITY_PASSWORD_SALT'])
+        return email
+    except Exception as e:
+        print(f"Token decoding error: {e}")
+        return None
+
+# Forgot Password Route
+@app.route('/lupa_password', methods=['GET', 'POST'])
+def lupa_password():
+    if request.method == 'POST':
+        email = request.form.get('email')
+        user = User.query.filter_by(email=email).first()
+
+        if user:
+            # Generate a token for password reset
+            token = generate_reset_token(user.email)
+
+            # Send email with the reset link
+            reset_link = url_for('reset_password', token=token, _external=True)
+            print(f"Reset Link: {reset_link}")
+
+            message = Message("Password Reset", recipients=[user.email])
+            message.body = f"Click the link to reset your password: {reset_link}"
+        
+            try:
+                mail.send(message)
+                flash("Password reset link sent to your email.")
+            except Exception as e:
+                flash(f"Error sending email: {str(e)}", 'error')
+                app.logger.error(f"Error sending email: {str(e)}")
+
+        else:
+            flash("Email not found.", 'error')
+
+    return render_template('lupa_password.html')
+
+# Password Reset Route
+@app.route('/reset_password/<token>', methods=['GET', 'POST'])
+def reset_password(token):
+     # Decode the token to get the user's email
+    user_email = decode_reset_token(token)
+
+    if not user_email:
+        flash("Invalid token.", 'error')
+        return redirect(url_for('login'))
+
+    # Find the user based on the email
+    user = User.query.filter_by(email=user_email).first()
+
+    if not user:
+        flash("User not found.", 'error')
+        return redirect(url_for('login'))
+
+    # TODO: Implement password reset logic here
+
+    if request.method == 'POST':
+        new_password = request.form.get('new_password')
+        confirm_password = request.form.get('confirm_password')
+
+        if new_password == confirm_password:
+            # Update the user's password in the database
+            user.password = generate_password_hash(new_password, method='pbkdf2:sha256')
+            db.session.commit()
+
+            flash("Password reset successfully.", 'success')
+            return redirect(url_for('login'))
+        else:
+            flash("Passwords do not match.", 'error')
+
+    return render_template('reset_password.html')
+
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
     if request.method == 'POST':
@@ -168,62 +269,67 @@ def dashboard():
 def input_file(): 
     return render_template('input_file.html')
 
-# Fungsi Pengecekan Judul
+# Fungsi Pengecekan Judul menggunakan PyMuPDF (MuPDF)
 def cek_judul(pdf_path):
-    doc = fitz.open(pdf_path) #buka pdf
+    doc = fitz.open(pdf_path)  # membuka file pdf
 
     results = []  # Inisialisasi list untuk menyimpan hasil pengecekan judul
+    word_count_result = "FAIL"  # Inisialisasi hasil default
+    ket_status_judul = ""
+    get_judul = ""
 
     for page_num in range(doc.page_count):
         page = doc[page_num]
-        text = page.get_text()
+        text = page.get_text() #ekstraksi atau pengambilan teks dari setiap halaman pdf
 
         lines = text.split('\n')
-        previous_lines = []
+        found_disusun_oleh = False # kondisi jika kata "Disusun oleh" tidak ditemukan
+        jumlah_kata = 0
+       
+        for line in lines: # pada setiap halaman, dilakukan pencarian kata 'Disusun oleh' untuk menemukan awal judul.
+            if 'Disusun oleh' in line:
+                found_disusun_oleh = True
+                break
 
-        for line in lines:
-            if not line.strip():
-                # Jika menemukan baris baru kosong, tambahkan bagian sebelumnya ke list results
-                if previous_lines:
-                    result = ' '.join(previous_lines)
-                    print(result) # print judul yang terdeteksi
+            # Menyimpan teks sebelum 'Disusun oleh'
+            get_judul += line + '\n'
 
-                    # Hitung jumlah kata pada variabel result
-                    word_count = len(result.split())
-                    results.append(f"Jumlah kata pada judul laporan anda: {word_count}")
+            # Hitung jumlah kata sebelum 'Disusun oleh'
+            jumlah_kata += len(line.split())
 
-                    # Berikan status sesuai jumlah kata
-                    if 12 <= word_count <= 20:
-                        word_count_result = "PASS"
-                        print(word_count_result) # ini untuk liat hasil di terminal aja
-                        note = f"Jumlah kata yang terdeteksi {word_count} kata. Penulisan judul sudah sesuai aturan"
-                        print(note) # ini untuk liat hasil di terminal aja
-                    elif word_count == 1:
-                        word_count_result = "Perbaiki posisi penomoran halaman"
-                    elif word_count > 20 or word_count < 12:
-                        word_count_result = "FAIL"
-                        print(word_count_result) # ini untuk liat hasil di terminal aja
-                        note = f"Jumlah kata yang terdeteksi {word_count} kata. Penulisan Judul belum sesuai aturan"
-                        print(note) # ini untuk liat hasil di terminal aja
-                    doc.close()
-                    return results, word_count_result, note  # Mengembalikan list hasil
-                previous_lines = []
-            else:
-                previous_lines.append(line)
+        # Jika sudah ditemukan kata 'Disusun oleh', berhenti dari loop
+        if found_disusun_oleh:
+            break
+
+    # Cetak judul yang terdeteksi
+    print(f"Judul :\n{get_judul}")
+
+    # Berikan status sesuai jumlah kata
+    if 12 <= jumlah_kata <= 20:
+        word_count_result = "PASS"
+        ket_status_judul = f"Jumlah kata yang terdeteksi {jumlah_kata} kata. Jumlah kata pada judul sudah sesuai aturan."
+        print(f"Status judul : {word_count_result}") #terminal
+        print(f"Jumlah kata yang terdeteksi {jumlah_kata} kata. Jumlah kata pada judul sudah sesuai aturan.\n") #terminal
+    elif jumlah_kata > 20 or jumlah_kata < 12: #kalau tidak ada judul masuk ke sini
+        word_count_result = "FAIL" 
+        ket_status_judul = f"Jumlah kata yang terdeteksi {jumlah_kata} kata. Jumlah kata pada judul belum sesuai aturan."
+        print(f"Status judul : {word_count_result}") #terminal
+        print(f"Jumlah kata yang terdeteksi {jumlah_kata} kata. Jumlah kata pada judul sudah sesuai aturan.\n") #terminal
 
     doc.close()
-    results.append(f"Tidak ditemukan baris baru kosong.")
+    return results, word_count_result, ket_status_judul if 'ket_status_judul' in locals() else "Kalimat 'Disusun oleh' tidak ditemukan"
 
 def cek_identitas_kaprodi(pdf_path):
     try:
         start_keyword = "ketua" 
         pdf_document = fitz.open(pdf_path)
-        match_found = False
 
+        # default
+        match_found = False
         status_kaprodi = "FAIL"
         ket_status_kaprodi = ""
         status_nip_kaprodi = "FAIL"
-        ket_status_nip_kaprodi = ""
+        ket_status_nip_kaprodi = "NIP tidak sesuai"
         numbers = []
 
         for page_num in range(pdf_document.page_count):
@@ -232,7 +338,7 @@ def cek_identitas_kaprodi(pdf_path):
 
             start_index = page_text.lower().find(start_keyword)
             if start_index != -1:
-                extracted_text = page_text[start_index + len(start_keyword):].strip()
+                extracted_text = page_text[start_index + len(start_keyword):].strip() #Jika kata kunci ditemukan, teks setelahnya diekstrak untuk pencarian lebih lanjut.
                 print(f"lingkup text untuk pencarian kaprodi: {extracted_text}") 
 
                 pattern_santi = r'Santi Sundari, S\.Si\., M\.T\.'
@@ -271,12 +377,15 @@ def cek_identitas_kaprodi(pdf_path):
             else:
                 print(f"NIP {number} tidak ditemukan dalam tabel lecturer.")
                 status_nip_kaprodi = "FAIL"
-                ket_status_nip_kaprodi = f"NIP Ketua Prodi belum tepat!"
+                ket_status_nip_kaprodi = f"NIP Ketua Prodi belum tepat!Seharusnya NIP Ketua Prodi D4 : NIP Ketua Prodi D3 : "
 
         if not match_found:
-            print("Nama tidak ditemukan dalam file PDF.")
             status_kaprodi = "FAIL"
-            ket_status_kaprodi = f"Nama Ketua Prodi belum sesuai dengan data dosen."
+            ket_status_kaprodi = f"Data tidak sesuai dengan data nama lengkap dan gelar Ketua Prodi!"
+            print("Data tidak sesuai dengan data nama lengkap dan gelar Ketua Prodi!")
+            status_nip_kaprodi = "FAIL"
+            ket_status_nip_kaprodi = "Data tidak sesuai dengan data NIP Ketua Prodi"
+            print("Data tidak sesuai dengan data NIP Ketua Prodi!")
         
         pdf_document.close()
         
@@ -284,7 +393,6 @@ def cek_identitas_kaprodi(pdf_path):
 
     except Exception as e:
         return str(e)
-
 
 def cek_dosbing(pdf_path, keyword_start, keyword_end, database_url):
     # Set the start and end keywords
@@ -467,8 +575,13 @@ def save_pdf():
     pdf_file = request.files['pdf_file']
 
     if pdf_file:
+        # Membuat nama file PDF yang unik dengan user name dan report ID
+        report = Report.query.filter_by(user_id=current_user.id).order_by(Report.id_report.desc()).first()
+        report_id = report.id_report if report else 1  # Default to 1 if no report found
+
         # Membuat nama file PDF yang unik dengan user name
-        pdf_filename = f"report_{current_user.full_name}.pdf" #inipenamaan file nya perlu diganti 
+        pdf_filename = f"Report_{current_user.full_name}_versi_{report_id}.pdf"
+
         pdf_path = os.path.join(reports_directory, pdf_filename)
 
         # Simpan file PDF di direktori reports_directory
@@ -478,8 +591,7 @@ def save_pdf():
         report = Report(
             path_file=f"{url_for('static', filename='reports')}/{pdf_filename}",
             tanggal=datetime.now(),
-            title_report="Your Title Here",  # You need to set an appropriate title
-            status="Pending",  # You may set the initial status as "Pending" or customize as needed
+            title_report=pdf_filename, 
             user=current_user  # Assuming you have the current_user object available
         )
 
@@ -490,6 +602,10 @@ def save_pdf():
     else:
         return jsonify({'error': 'No PDF file received'}), 400
 
+def count_fail_occurrences(*args):
+    fail_count = sum(1 for status in args if status == 'FAIL')
+    return fail_count
+    
 @app.route('/upload', methods=['POST'])
 def upload():
     uploaded_file = request.files['pdf_file']
@@ -504,29 +620,60 @@ def upload():
         user_name = current_user.full_name
         user_nim = current_user.student_id
 
+        # Tangkap nilai 'Title' dari formulir
+        title = request.form.get('title')
+
         # Set the start and end keywords untuk cek nama dosbing
         start_keyword = 'Pembimbing'
         end_keyword = 'NIP'
 
         # Lakukan pengecekan judul
-        title_messages, word_count_result, note = cek_judul(pdf_path)
+        title_messages, word_count_result, ket_status_judul = cek_judul(pdf_path)
 
         # Lakukan pengecekan nama dosbing
         status_nama_dosbing, keterangan = cek_dosbing(pdf_path, start_keyword, end_keyword, database_url)
 
         # Lakukan pengecekan nip dosbing
         status_nip_dosbing, ket_nip_dosbing = cek_nip_dosbing(pdf_path, start_keyword, end_keyword, database_url)
-       
-
-        #Lakukan pengecekan kaprodi
-        status_kaprodi, ket_status_kaprodi, status_nip_kaprodi, ket_status_nip_kaprodi = cek_identitas_kaprodi(pdf_path)
 
         # Lakukan pengecekan kaprodi
-        # deteksi_nama(pdf_path)
-     
+        status_kaprodi, ket_status_kaprodi, status_nip_kaprodi, ket_status_nip_kaprodi = cek_identitas_kaprodi(pdf_path)
+
+        # Display the values in the terminal
+        print("word_count_result:", word_count_result)
+        print("status_nama_dosbing:", status_nama_dosbing)
+        print("status_nip_dosbing:", status_nip_dosbing)
+        print("status_kaprodi:", status_kaprodi)
+        print("status_nip_kaprodi:", status_nip_kaprodi)
+
+        # Count 'FAIL' occurrences
+        fail_count = count_fail_occurrences(word_count_result, status_nama_dosbing, status_nip_dosbing, status_kaprodi, status_nip_kaprodi)
+
+        # keterangan total salah
+        ket_fail_count = f"{fail_count} FAIL"
+
+        # Print the total count
+        print(f"Total 'FAIL' occurrences: {fail_count}")
+
+        # Check if there are no errors
+        if fail_count == 0:
+            print("Tidak ada kesalahan")
+
+        # Simpan 'Title' bersama dengan file ke dalam tabel Report
+        new_report = Report(
+            path_file=f"{url_for('static', filename='reports')}/{uploaded_file.filename}",
+            tanggal=datetime.now(),
+            title_report=title,  # Simpan 'Title'
+            status=ket_fail_count,  # Set status sesuai kebutuhan
+            user=current_user
+        )
+
+        db.session.add(new_report)
+        db.session.commit()
+
         os.remove(pdf_path)  # Hapus file setelah digunakan
 
-    return render_template('report.html', title_messages=title_messages, user_name=user_name, user_nim=user_nim, word_count_result=word_count_result, note=note, status_nama_dosbing=status_nama_dosbing, keterangan=keterangan, status_nip_dosbing=status_nip_dosbing, ket_nip_dosbing=ket_nip_dosbing, status_kaprodi=status_kaprodi, ket_status_kaprodi=ket_status_kaprodi, status_nip_kaprodi=status_nip_kaprodi, ket_status_nip_kaprodi=ket_status_nip_kaprodi)
+    return render_template('report.html', title_messages=title_messages, user_name=user_name, user_nim=user_nim, word_count_result=word_count_result, ket_status_judul=ket_status_judul, status_nama_dosbing=status_nama_dosbing, keterangan=keterangan, status_nip_dosbing=status_nip_dosbing, ket_nip_dosbing=ket_nip_dosbing, status_kaprodi=status_kaprodi, ket_status_kaprodi=ket_status_kaprodi, status_nip_kaprodi=status_nip_kaprodi, ket_status_nip_kaprodi=ket_status_nip_kaprodi, fail_count=fail_count)
 
 if __name__ == '__main__':
     app.run()
