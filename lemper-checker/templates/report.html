@@ -51,9 +51,9 @@
             var textLeft = leftMargin;
             var textTop = 20;
             doc.setFontSize(12);
-            doc.text('User  : {{ user_name }}', textLeft, textTop);
-            doc.text('NIM   : {{ user_nim }}', textLeft, textTop + 5);
-
+            doc.text('Nama Mahasiswa             : {{ user_name }}', textLeft, textTop);
+            doc.text('NIM                                   : {{ user_nim }}', textLeft, textTop + 5);
+                      
             var currentDate = new Date();
             var options = { 
                 timeZone: 'Asia/Jakarta',
@@ -62,7 +62,7 @@
                 year: 'numeric'
             };
             var formattedDate = currentDate.toLocaleDateString('en-US', options);
-            doc.text('Date  : ' + formattedDate, textLeft, textTop + 10);
+            doc.text('Tanggal Pemeriksaan       : ' + formattedDate, textLeft, textTop + 10);
 
             doc.setFontSize(16);
             doc.text('Halaman Persetujuan', leftMargin, 50);

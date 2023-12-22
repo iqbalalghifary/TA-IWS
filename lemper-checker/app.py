@@ -19,9 +19,6 @@ from datetime import datetime  # Import the datetime module
 from flask_mail import Mail, Message
 from itsdangerous import URLSafeTimedSerializer
 
-# Muat konfigurasi dari file .env
-load_dotenv()
-
 app = Flask(__name__)
 load_dotenv() #load .env
 
@@ -234,7 +231,7 @@ def signup():
         db.session.add(new_user)
         db.session.commit()
 
-        flash('You are now registered and can log in.', 'success')
+        flash('Registration successful!', 'success')
         return redirect(url_for('login'))
 
     return render_template('signup.html')
@@ -282,6 +279,7 @@ def cek_judul(pdf_path):
         page = doc[page_num]
         text = page.get_text() #ekstraksi atau pengambilan teks dari setiap halaman pdf
 
+        #disini proses pengecekan judul dimulai
         lines = text.split('\n')
         found_disusun_oleh = False # kondisi jika kata "Disusun oleh" tidak ditemukan
         jumlah_kata = 0
@@ -302,6 +300,9 @@ def cek_judul(pdf_path):
             break
 
     # Cetak judul yang terdeteksi
+    print(f"Teks yang diinput :\n{text}")
+
+    # Cetak judul yang terdeteksi
     print(f"Judul :\n{get_judul}")
 
     # Berikan status sesuai jumlah kata
@@ -312,9 +313,9 @@ def cek_judul(pdf_path):
         print(f"Jumlah kata yang terdeteksi {jumlah_kata} kata. Jumlah kata pada judul sudah sesuai aturan.\n") #terminal
     elif jumlah_kata > 20 or jumlah_kata < 12: #kalau tidak ada judul masuk ke sini
         word_count_result = "FAIL" 
-        ket_status_judul = f"Jumlah kata yang terdeteksi {jumlah_kata} kata. Jumlah kata pada judul belum sesuai aturan."
+        ket_status_judul = f"Jumlah kata yang terdeteksi {jumlah_kata} kata. Jumlah kata pada judul belum sesuai aturan. seharusnya terdiri dari 12-20 kata"
         print(f"Status judul : {word_count_result}") #terminal
-        print(f"Jumlah kata yang terdeteksi {jumlah_kata} kata. Jumlah kata pada judul sudah sesuai aturan.\n") #terminal
+        print(f"Jumlah kata yang terdeteksi {jumlah_kata} kata. Jumlah kata pada judul belum sesuai aturan.\n") #terminal
 
     doc.close()
     return results, word_count_result, ket_status_judul if 'ket_status_judul' in locals() else "Kalimat 'Disusun oleh' tidak ditemukan"
@@ -327,9 +328,9 @@ def cek_identitas_kaprodi(pdf_path):
         # default
         match_found = False
         status_kaprodi = "FAIL"
-        ket_status_kaprodi = ""
+        ket_status_kaprodi = "Nama dan Gelar Ketua Prodi tidak ditemukan"
         status_nip_kaprodi = "FAIL"
-        ket_status_nip_kaprodi = "NIP tidak sesuai"
+        ket_status_nip_kaprodi = "NIP Ketua Prodi tidak ditemukan"
         numbers = []
 
         for page_num in range(pdf_document.page_count):
@@ -339,12 +340,12 @@ def cek_identitas_kaprodi(pdf_path):
             start_index = page_text.lower().find(start_keyword)
             if start_index != -1:
                 extracted_text = page_text[start_index + len(start_keyword):].strip() #Jika kata kunci ditemukan, teks setelahnya diekstrak untuk pencarian lebih lanjut.
-                print(f"lingkup text untuk pencarian kaprodi: {extracted_text}") 
+                print(f"\nrange text untuk pencarian kaprodi:\n{extracted_text}") 
 
                 pattern_santi = r'Santi Sundari, S\.Si\., M\.T\.'
                 pattern_ghifari = r'Ghifari Munawar, S\.Kom\., M\.T\.'
 
-                match_santi = re.search(pattern_santi, extracted_text)
+                match_santi = re.search(pattern_santi, extracted_text) #re.search() digunakan untuk mencari pola regex dalam teks extracted_text.
                 match_ghifari = re.search(pattern_ghifari, extracted_text)
 
                 if match_santi:
@@ -353,31 +354,42 @@ def cek_identitas_kaprodi(pdf_path):
                     numbers = re.findall(r'\d+', remaining_text)
                     status_kaprodi = "PASS"
                     ket_status_kaprodi = f"Nama Ketua Prodi sesuai dengan data dosen!"
-                    print(f"nama yang ditemukan: {remaining_text}")
+                    print(f"NIP Ketua Prodi yang ditemukan: {numbers}")
                     print(f"Nama ditemukan di halaman {page_num + 1}: Santi Sundari, S.Si., M.T.")
-                    print(f"Angka setelah nama: {numbers}")
 
                 elif match_ghifari:
                     match_found = True
-                    remaining_text = extracted_text[match_ghifari.end():]
-                    numbers = re.findall(r'\d+', remaining_text)
+                    remaining_text = extracted_text[match_ghifari.end():] #remaining_text menyimpan text setelah match ghifari
+                    numbers = re.findall(r'\d+', remaining_text) #dari remaining_text diambil angkanya saja
                     status_kaprodi = "PASS"
                     ket_status_kaprodi = f"Nama Ketua Prodi sesuai dengan data dosen!"
-                    print(f"nama yang ditemukan: {remaining_text}")
+                    print(f"NIP Ketua Prodi yang ditemukan: {numbers}")
                     print(f"Nama ditemukan di halaman {page_num + 1}: Ghifari Munawar, S.Kom., M.T.")
-                    print(f"Angka setelah nama: {numbers}")
 
         # Mencocokkan nomor dengan nip pada tabel
+        # Mencocokkan nomor dengan nip pada tabel
         for number in numbers:
-            lecturer = Lecturer.query.filter_by(nip=number).first()
+            lecturer = None
+
+            if match_santi:
+                lecturer = Lecturer.query.filter(
+                    Lecturer.nip == number,
+                    Lecturer.full_name == 'Santi Sundari, S.Si., M.T.'
+                ).first()
+            elif match_ghifari:
+                lecturer = Lecturer.query.filter(
+                    Lecturer.nip == number,
+                    Lecturer.full_name == 'Ghifari Munawar, S.Kom., M.T.'
+                ).first()
+
             if lecturer:
                 print(f"NIP {number} sudah benar. Nama: {lecturer.full_name}")
                 status_nip_kaprodi = "PASS"
-                ket_status_nip_kaprodi = f"NIP Ketua Prodi sudah tepat!"
+                ket_status_nip_kaprodi = f"NIP Pembimbing sudah tepat! NIP yang terdeteksi : {number}"
             else:
                 print(f"NIP {number} tidak ditemukan dalam tabel lecturer.")
                 status_nip_kaprodi = "FAIL"
-                ket_status_nip_kaprodi = f"NIP Ketua Prodi belum tepat!Seharusnya NIP Ketua Prodi D4 : NIP Ketua Prodi D3 : "
+                ket_status_nip_kaprodi = f"NIP Pembimbing belum tepat! NIP yang terdeteksi : {number} Seharusnya NIP Pembimbing D4 : NIP Pembimbing D3 : "
 
         if not match_found:
             status_kaprodi = "FAIL"
@@ -459,6 +471,10 @@ def cek_dosbing(pdf_path, keyword_start, keyword_end, database_url):
     return status_nama_dosbing, keterangan
 
 def cek_nip_dosbing(pdf_path, start_keyword, end_keyword, database_url):
+    # Initialize variables with default values
+    status_nip_dosbing = "FAIL"
+    ket_nip_dosbing = "NIP Dosbing tidak ditemukan"
+    
     def extract_text_from_pdf(pdf_path):
         pdf_document = fitz.open(pdf_path)
         text = ""
@@ -587,11 +603,15 @@ def save_pdf():
         # Simpan file PDF di direktori reports_directory
         pdf_file.save(pdf_path)
 
+        title = session.get('title', '')  # Retrieve title from the session
+        ket_fail_count = session.get('ket_fail_count', '')  # Retrieve ket_fail_count from the session
+
         # Insert data into the Report table
         report = Report(
             path_file=f"{url_for('static', filename='reports')}/{pdf_filename}",
             tanggal=datetime.now(),
-            title_report=pdf_filename, 
+            title_report=title,  # Use the retrieved title
+            status=ket_fail_count,  # Use the retrieved ket_fail_count
             user=current_user  # Assuming you have the current_user object available
         )
 
@@ -622,6 +642,8 @@ def upload():
 
         # Tangkap nilai 'Title' dari formulir
         title = request.form.get('title')
+        #biar bisa ditangkap di route save pdf
+        session['title'] = title  # Store title in the session
 
         # Set the start and end keywords untuk cek nama dosbing
         start_keyword = 'Pembimbing'
@@ -651,6 +673,7 @@ def upload():
 
         # keterangan total salah
         ket_fail_count = f"{fail_count} FAIL"
+        session['ket_fail_count'] = ket_fail_count  # Store ket_fail_count in the session
 
         # Print the total count
         print(f"Total 'FAIL' occurrences: {fail_count}")
@@ -659,20 +682,7 @@ def upload():
         if fail_count == 0:
             print("Tidak ada kesalahan")
 
-        # Simpan 'Title' bersama dengan file ke dalam tabel Report
-        new_report = Report(
-            path_file=f"{url_for('static', filename='reports')}/{uploaded_file.filename}",
-            tanggal=datetime.now(),
-            title_report=title,  # Simpan 'Title'
-            status=ket_fail_count,  # Set status sesuai kebutuhan
-            user=current_user
-        )
-
-        db.session.add(new_report)
-        db.session.commit()
-
-        os.remove(pdf_path)  # Hapus file setelah digunakan
-
+    #Data ini disampaikan langsung ke template report.html sebagai argumen dari fungsi render_template, jadi tidak disimpan di server
     return render_template('report.html', title_messages=title_messages, user_name=user_name, user_nim=user_nim, word_count_result=word_count_result, ket_status_judul=ket_status_judul, status_nama_dosbing=status_nama_dosbing, keterangan=keterangan, status_nip_dosbing=status_nip_dosbing, ket_nip_dosbing=ket_nip_dosbing, status_kaprodi=status_kaprodi, ket_status_kaprodi=ket_status_kaprodi, status_nip_kaprodi=status_nip_kaprodi, ket_status_nip_kaprodi=ket_status_nip_kaprodi, fail_count=fail_count)
 
 if __name__ == '__main__':

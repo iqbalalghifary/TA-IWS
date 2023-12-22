@@ -4,8 +4,10 @@
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css">
     <title>Lemper Checker App</title>
     <style>
-        /* Additional custom styles for the header */
-
+        .bold-black-text {
+            font-weight: bold;
+            color: #000000;
+        }
     </style>
 </head>
 <body>
@@ -18,17 +20,15 @@
         </button>
         <div class="collapse navbar-collapse" id="navbarNav">
             <ul class="navbar-nav ml-auto">
-                <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                        More
-                    </a>
-                    <div class="dropdown-menu dropdown-menu-right" aria-labelledby="navbarDropdown">
-                        <a class="dropdown-item" href="/login">Login</a>
-                        <a class="dropdown-item" href="/signup">Sign Up</a>
-                    </div>
+                <li class="nav-item">
+                    <a class="nav-link bold-black-text" href="/login">Masuk</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link bold-black-text" href="/signup">Daftar</a>
                 </li>
             </ul>
         </div>
+        
     </nav>
 
     <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js"></script>

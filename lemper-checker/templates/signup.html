@@ -5,6 +5,7 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <title>Register</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@10"></script>
     <link rel="stylesheet" href="static/css/register.css">
 </head>
 
@@ -13,7 +14,7 @@
     <div id="card">
         <div id="card-content">
             <div id="card-title">
-                <h2>REGISTER</h2>
+                <h2>DAFTAR</h2>
             </div>
             <form method="post" class="form" action="/signup">
                 <label for="user-fullname" style="padding-top:13px">
@@ -48,7 +49,7 @@
                 <div class="form-border"></div>
                 <span id="password-match-error" style="color: red;"></span>
             
-                <input id="submit-btn" type="submit" name="submit" value="SIGN UP" />
+                <input id="submit-btn" type="submit" name="submit" value="Daftar Sekarang" />
             </form>                
         </div>
     </div>
@@ -62,47 +63,53 @@
     </ul>
     {% endif %}
     {% endwith %}
-
     <script>
-        document.getElementById("user-password").addEventListener("input", function () {
-            var password = document.getElementById("user-password").value;
-            var errorElement = document.getElementById("password-error");
-
-            // Validasi panjang password
-            if (password.length < 8) {
-                errorElement.textContent = "Password harus memiliki minimal 8 karakter";
+        document.getElementById("submit-btn").addEventListener("click", function (event) {
+            event.preventDefault(); // Mencegah form untuk langsung submit
+    
+            // Tambahkan logika untuk memeriksa apakah pendaftaran sudah lengkap
+            if (isRegistrationComplete()) {
+                // Tampilkan Sweet Alert sukses jika pendaftaran sudah lengkap
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Pendaftaran Berhasil',
+                    text: 'Terima kasih atas pendaftarannya!',
+                    confirmButtonColor: '#3085d6',
+                    confirmButtonText: 'OK'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        // Redirect atau lakukan tindakan lain setelah pendaftaran berhasil
+                        window.location.href = "/login"; // Ganti dengan URL yang sesuai
+                    }
+                });
             } else {
-                // Validasi keberadaan huruf kapital, huruf kecil, dan angka
-                var hasUpperCase = /[A-Z]/.test(password);
-                var hasLowerCase = /[a-z]/.test(password);
-                var hasDigit = /\d/.test(password);
-
-                if (hasUpperCase && hasLowerCase && hasDigit) {
-                    errorElement.textContent = "";
-                } else {
-                    errorElement.textContent = "Password harus terdiri dari huruf kapital, huruf kecil, dan angka";
-                }
+                // Tampilkan Sweet Alert error jika pendaftaran belum lengkap
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: 'Mohon lengkapi dulu form pendaftaran!',
+                    confirmButtonColor: '#d33',
+                    confirmButtonText: 'OK'
+                });
             }
         });
-
-        var passwordInput = document.getElementById("user-password");
-        var confirmPasswordInput = document.getElementById("confirm-password");
-        var passwordMatchErrorElement = document.getElementById("password-match-error");
-
-        function checkPasswordMatch() {
-            var password = passwordInput.value;
-            var confirmPassword = confirmPasswordInput.value;
-
-            if (password === confirmPassword) {
-                passwordMatchErrorElement.textContent = "";
+    
+        function isRegistrationComplete() {
+            // Tambahkan logika untuk memeriksa apakah pendaftaran sudah lengkap
+            // Contoh: Periksa apakah semua field form sudah terisi
+            var fullname = document.getElementById("user-fullname").value;
+            var nim = document.getElementById("user-nim").value;
+            var email = document.getElementById("user-email").value;
+            var password = document.getElementById("user-password").value;
+            var confirmPassword = document.getElementById("confirm-password").value;
+    
+            if (fullname && nim && email && password && confirmPassword) {
+                return true;
             } else {
-                passwordMatchErrorElement.textContent;
+                return false;
             }
         }
-
-        passwordInput.addEventListener("input", checkPasswordMatch);
-        confirmPasswordInput.addEventListener("input", checkPasswordMatch);
-    </script>
+    </script>      
 
     {% include "footer.html" %}
 </body>

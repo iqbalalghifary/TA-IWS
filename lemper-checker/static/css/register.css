@@ -28,9 +28,9 @@ label {
   background: white;
   border-radius: 8px;
   box-shadow: 1px 2px 8px rgba(0, 0, 0, 0.65);
-  height: 650px;
+  height: 680px;
   margin: 6rem auto 8.1rem auto;
-  width: 360px;
+  width: 380px;
 }
 
 #card-content {
@@ -65,7 +65,7 @@ label {
   margin: 0 auto;
   margin-top: 50px;
   transition: 0.25s;
-  width: 153px;
+  width: 180px;
 }
 
 #submit-btn:hover {
@@ -94,14 +94,14 @@ label {
 /* Responsive Styles */
 @media screen and (max-width: 768px) {
   #card {
-      width: 80%;
-      margin: 6rem auto;
+    width: 80%;
+    margin: 6rem auto;
   }
 }
 
 @media screen and (max-width: 480px) {
   #card {
-      width: 90%;
-      margin: 6rem auto;
+    width: 90%;
+    margin: 6rem auto;
   }
 }
