@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.19.0/font/bootstrap-icons.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.18.0/font/bootstrap-icons.css">
+    <title>Reports Table</title>
+    <style>
+        .button-container {
+            display: flex;
+            justify-content: space-between;
+            background-color: #f8f9fa;
+            padding: 10px;
+            align-items: center;
+        }
+
+        table {
+            width: 100%;
+            margin-top: 20px;
+        }
+
+        th, td {
+            text-align: left;
+            padding: 10px; /* Add padding for better readability */
+        }
+
+        th {
+            cursor: pointer;
+        }
+
+        .page-link {
+            cursor: pointer;
+            margin: 0 5px;
+            text-decoration: none;
+            color: #007bff;
+        }
+
+        .page-link.active {
+            font-weight: bold;
+            color: #0056b3;
+        }
+
+        /* Style for header columns with background color #ccd4dd */
+        th[data-colored] {
+            background-color: #ccd4dd;
+        }
+        
+        .label-container {
+            margin-left: 1em; /* Atur margin kiri sebanyak 1 spasi */
+        }
+
+        /* Style for 'FAIL' status text in red */
+        .fail-status {
+            color: red !important;
+        }
+
+        /* Style for 'No errors' text in green */
+        .no-error-status {
+            color: green !important;
+        }
+        
+    </style>
+</head>
+<body>
+    <div class="header">
+        {% include "header_user.html" %}
+    </div><br>
+    <div class="label-container">
+        <span class="label-text" style="font-size: 22px;"><strong> Cek Halaman Persetujuan</strong></span><br>
+        <span class="subtitle-text"> Data riwayat pengecekan anda</span>
+    </div>
+
+    <br></br>
+
+    <div class="button-container">
+        <a href="/input_file" class="btn btn-primary">
+            <img class="" src="/static/icon/plus-lg.svg" alt="Plus Icon" width="16" height="16" style="filter: invert(100%);">
+            Mulai Pengecekan
+            <i></i>
+        </a>
+    </div>
+
+    <table class="table table-hover" id="reportsTable">
+        <thead>
+            <tr>
+                <th scope="col" data-colored>No</th>
+                <th scope="col" data-colored>Title</th>
+                <th scope="col" data-colored>Status</th>
+                <th scope="col" data-colored>File</th>
+                <th scope="col" data-colored>Waktu</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for report in reports %}
+            <tr>
+                <th scope="row">{{ report.id }}</th>
+                <td>{{ report.title }}</td>
+                <td {% if report.status == 'FAIL' %} class="fail-status" {% elif fail_count == 0 %} class="no-error-status" {% endif %}>
+                    {{ report.status }}
+                </td>
+                <td>
+                    <a href="{{ report.file }}" download>
+                        <img src="/static/icon/file-earmark-text.svg" alt="File Icon">
+                    </a>
+                </td>
+                <td>{{ report.tanggal.strftime('%Y-%m-%d %H:%M') }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- Bootstrap JS and custom script for pagination and sorting -->
+    <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Fungsi untuk mengatur nomor pada kolom 'No'
+        function setRowNumbers() {
+            var table = document.getElementById("reportsTable");
+            var rows = table.rows;
+    
+            for (var i = 1; i < rows.length; i++) {
+                var numberCell = rows[i].getElementsByTagName("th")[0];
+                numberCell.innerText = i;
+            }
+        }
+    
+        // Panggil fungsi setRowNumbers setelah tabel dimuat
+        window.onload = function () {
+            setRowNumbers();
+        };
+    </script>
+</body>
+</html>
